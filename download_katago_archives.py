@@ -15,6 +15,8 @@ EXTRACT_DIR_NAME = "sgfs"
 TARGET_YEAR = "2025"
 USER_AGENT = "Mozilla/5.0"
 CHUNK_SIZE = 1024 * 1024
+NETWORK_TIMEOUT_SECONDS = 30
+PROGRESS_EVERY_BYTES = 10 * 1024 * 1024
 RETRIES = 6
 RETRY_DELAY_SECONDS = 5
 REQUEST_DELAY_SECONDS = 3
@@ -35,7 +37,7 @@ class LinkParser(HTMLParser):
 
 def fetch_text(url):
     request = Request(url, headers={"User-Agent": USER_AGENT})
-    with urlopen(request) as response:
+    with urlopen(request, timeout=NETWORK_TIMEOUT_SECONDS) as response:
         charset = response.headers.get_content_charset() or "utf-8"
         return response.read().decode(charset, errors="replace")
 
@@ -78,6 +80,7 @@ def unpack_file(archive_path, extract_dir):
         print(f"Already unpacked: {filename}")
         return
 
+    print(f"Unpacking: {filename}")
     os.makedirs(extract_dir, exist_ok=True)
     with tarfile.open(archive_path, "r:bz2") as archive:
         archive.extractall(extract_dir)
@@ -99,13 +102,20 @@ def download_file(url, output_dir):
 
     for attempt in range(1, RETRIES + 1):
         try:
+            print(f"Downloading: {filename} (attempt {attempt}/{RETRIES})")
             request = Request(url, headers={"User-Agent": USER_AGENT})
-            with urlopen(request) as response, open(temp_destination, "wb") as output_file:
+            with urlopen(request, timeout=NETWORK_TIMEOUT_SECONDS) as response, open(temp_destination, "wb") as output_file:
+                total_bytes = 0
+                next_progress = PROGRESS_EVERY_BYTES
                 while True:
                     chunk = response.read(CHUNK_SIZE)
                     if not chunk:
                         break
                     output_file.write(chunk)
+                    total_bytes += len(chunk)
+                    if total_bytes >= next_progress:
+                        print(f"  received {total_bytes // (1024 * 1024)} MiB: {filename}")
+                        next_progress += PROGRESS_EVERY_BYTES
             os.replace(temp_destination, destination)
             print(f"Downloaded: {filename}")
             return destination, True

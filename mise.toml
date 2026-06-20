@@ -1,0 +1,2 @@
+[tasks."dev:create-image"]
+run = 'podman build -t docker.io/tasuki/pi-go-sleep:latest -f Containerfile.dev .'

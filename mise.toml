@@ -1,2 +1,21 @@
 [tasks."dev:create-image"]
 run = 'podman build -t docker.io/tasuki/pi-go-sleep:latest -f Containerfile.dev .'
+
+[tasks."dev:serve"]
+run = 'serve -p 5733 --single'
+
+[tasks."dev:build"]
+run = """
+watchexec --restart --verbose \
+  --wrap-process=session --exts=elm --debounce=100ms \
+  -- elm make src/Main.elm --debug --output=go-sleep.js
+"""
+
+[tasks.dev]
+depends = ["dev:build", "dev:serve"]
+
+[tasks.build]
+run = 'elm make src/Main.elm --output=go-sleep.js'
+
+[tasks.test]
+run = 'elm-test'

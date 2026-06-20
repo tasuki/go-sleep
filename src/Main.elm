@@ -490,18 +490,6 @@ formatResult game =
     if raw == "0" || raw == "" then
         "Draw"
 
-    else if raw == "B+R" then
-        "Black wins by resignation"
-
-    else if raw == "W+R" then
-        "White wins by resignation"
-
-    else if String.startsWith "B+" raw then
-        "Black wins by " ++ String.dropLeft 2 raw
-
-    else if String.startsWith "W+" raw then
-        "White wins by " ++ String.dropLeft 2 raw
-
     else
         raw
 

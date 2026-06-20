@@ -5,14 +5,14 @@ import Browser.Navigation as Nav
 import Dict
 import Html exposing (Html, div, span, text)
 import Html.Attributes exposing (class, hidden, id)
+import Html.Events exposing (onClick)
 import Http
-import Process
 import Random
 import Set exposing (Set)
 import Sgf exposing (Color(..), Game, Move)
 import Svg exposing (Svg, circle, g, line, svg)
 import Svg.Attributes as SvgAttr
-import Task
+import Time
 import Url exposing (Url)
 
 
@@ -70,6 +70,7 @@ type Msg
     = GotSgf (Result Http.Error String)
     | PickedRecord String
     | Step
+    | Skip
     | UrlRequested Browser.UrlRequest
     | UrlChanged Url
 
@@ -83,7 +84,7 @@ main =
     Browser.application
         { init = \_ _ _ -> init
         , update = update
-        , subscriptions = \_ -> Sub.none
+        , subscriptions = subscriptions
         , view = view
         , onUrlRequest = UrlRequested
         , onUrlChange = UrlChanged
@@ -139,6 +140,9 @@ update msg model =
                 _ ->
                     ( model, Cmd.none )
 
+        Skip ->
+            ( Loading, fetchSgf )
+
 
 chooseRecord : List String -> ( Model, Cmd Msg )
 chooseRecord records =
@@ -171,7 +175,7 @@ startGame record =
 playGame : Game -> ( Model, Cmd Msg )
 playGame game =
     ( Playing (initialPlayback game)
-    , delay
+    , Cmd.none
     )
 
 
@@ -205,13 +209,13 @@ stepPlayback playback =
                     , remainingMoves = rest
                     , lastMove = rememberLastMove move playback.lastMove
                 }
-            , delay
+            , Cmd.none
             )
 
         [] ->
             if not playback.showingResult then
                 ( Playing { playback | showingResult = True }
-                , delay
+                , Cmd.none
                 )
 
             else
@@ -228,10 +232,14 @@ rememberLastMove move previous =
             previous
 
 
-delay : Cmd Msg
-delay =
-    Process.sleep stepDelayMilliseconds
-        |> Task.perform (\_ -> Step)
+subscriptions : Model -> Sub Msg
+subscriptions model =
+    case model of
+        Playing _ ->
+            Time.every stepDelayMilliseconds (\_ -> Step)
+
+        _ ->
+            Sub.none
 
 
 view : Model -> Browser.Document Msg
@@ -257,7 +265,7 @@ menu =
                 ]
             ]
         , div [ class "item" ]
-            [ div [ class "icon" ]
+            [ div [ class "icon", onClick Skip ]
                 [ text "x"
                 , span [ class "tooltip" ] [ text " skip" ]
                 ]

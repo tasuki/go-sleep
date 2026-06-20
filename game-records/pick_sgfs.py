@@ -29,7 +29,7 @@ from pathlib import Path
 
 
 SGF_DIR = Path("sgfs")
-DIST_DIR = Path("dist")
+DIST_DIR = Path("../public")
 EXCITING_FILE = DIST_DIR / "exciting.sgf"
 BORING_FILE = DIST_DIR / "boring.sgf"
 

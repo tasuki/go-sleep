@@ -4,7 +4,7 @@ import Browser
 import Browser.Navigation as Nav
 import Dict
 import Html exposing (Html, div, span, text)
-import Html.Attributes exposing (class, hidden, id, style)
+import Html.Attributes exposing (class, hidden, id)
 import Http
 import Process
 import Random
@@ -59,7 +59,9 @@ type Model
 
 type alias Playback =
     { game : Game
-    , shownMoves : Int
+    , board : Board
+    , remainingMoves : List Move
+    , lastMove : Maybe Move
     , showingResult : Bool
     }
 
@@ -168,42 +170,62 @@ startGame record =
 
 playGame : Game -> ( Model, Cmd Msg )
 playGame game =
-    ( Playing
-        { game = game
-        , shownMoves = initialShownMoves game
-        , showingResult = False
-        }
+    ( Playing (initialPlayback game)
     , delay
     )
 
 
+initialPlayback : Game -> Playback
+initialPlayback game =
+    case game.moves of
+        firstMove :: rest ->
+            { game = game
+            , board = applyMove firstMove Dict.empty
+            , remainingMoves = rest
+            , lastMove = rememberLastMove firstMove Nothing
+            , showingResult = False
+            }
+
+        [] ->
+            { game = game
+            , board = Dict.empty
+            , remainingMoves = []
+            , lastMove = Nothing
+            , showingResult = False
+            }
+
+
 stepPlayback : Playback -> ( Model, Cmd Msg )
 stepPlayback playback =
-    let
-        moveCount =
-            List.length playback.game.moves
-    in
-    if playback.shownMoves < moveCount then
-        ( Playing { playback | shownMoves = playback.shownMoves + 1 }
-        , delay
-        )
+    case playback.remainingMoves of
+        move :: rest ->
+            ( Playing
+                { playback
+                    | board = applyMove move playback.board
+                    , remainingMoves = rest
+                    , lastMove = rememberLastMove move playback.lastMove
+                }
+            , delay
+            )
 
-    else if not playback.showingResult then
-        ( Playing { playback | showingResult = True }
-        , delay
-        )
+        [] ->
+            if not playback.showingResult then
+                ( Playing { playback | showingResult = True }
+                , delay
+                )
 
-    else
-        ( Loading, fetchSgf )
+            else
+                ( Loading, fetchSgf )
 
 
-initialShownMoves : Game -> Int
-initialShownMoves game =
-    if List.isEmpty game.moves then
-        0
+rememberLastMove : Move -> Maybe Move -> Maybe Move
+rememberLastMove move previous =
+    case move.point of
+        Just _ ->
+            Just move
 
-    else
-        1
+        Nothing ->
+            previous
 
 
 delay : Cmd Msg
@@ -218,7 +240,7 @@ view model =
     , body =
         [ menu
         , div [ id "board-container" ]
-            [ boardView (visibleMoves model)
+            [ boardView (visibleBoard model) (visibleLastMove model)
             , resultView model
             ]
         ]
@@ -243,12 +265,11 @@ menu =
         ]
 
 
-boardView : List Move -> Html Msg
-boardView moves =
+boardView : Board -> Maybe Move -> Html Msg
+boardView board lastMove =
     let
         stones =
-            moves
-                |> boardAfterMoves
+            board
                 |> Dict.toList
                 |> List.map boardStoneView
     in
@@ -258,7 +279,7 @@ boardView moves =
         ]
         [ g [ SvgAttr.id "lines" ] boardLines
         , g [ SvgAttr.id "stars" ] starPoints
-        , g [ SvgAttr.id "stones" ] (stones ++ lastMoveMarker moves)
+        , g [ SvgAttr.id "stones" ] (stones ++ lastMoveMarker lastMove)
         ]
 
 
@@ -413,9 +434,9 @@ oppositeColor color =
             Black
 
 
-lastMoveMarker : List Move -> List (Svg Msg)
-lastMoveMarker moves =
-    case lastMoveWithPoint moves of
+lastMoveMarker : Maybe Move -> List (Svg Msg)
+lastMoveMarker lastMove =
+    case lastMove of
         Just move ->
             case move.point of
                 Just point ->
@@ -436,21 +457,6 @@ lastMoveMarker moves =
             []
 
 
-lastMoveWithPoint : List Move -> Maybe Move
-lastMoveWithPoint moves =
-    List.foldl
-        (\move previous ->
-            case move.point of
-                Just _ ->
-                    Just move
-
-                Nothing ->
-                    previous
-        )
-        Nothing
-        moves
-
-
 resultView : Model -> Html Msg
 resultView model =
     case model of
@@ -468,14 +474,24 @@ resultView model =
             div [ id "result", hidden True ] []
 
 
-visibleMoves : Model -> List Move
-visibleMoves model =
+visibleBoard : Model -> Board
+visibleBoard model =
     case model of
         Playing playback ->
-            List.take playback.shownMoves playback.game.moves
+            playback.board
 
         _ ->
-            []
+            Dict.empty
+
+
+visibleLastMove : Model -> Maybe Move
+visibleLastMove model =
+    case model of
+        Playing playback ->
+            playback.lastMove
+
+        _ ->
+            Nothing
 
 
 formatResult : Game -> String

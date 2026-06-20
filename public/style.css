@@ -11,11 +11,11 @@
     src: url('recursive-sans-csl-700.woff2') format('woff2');
 }
 
-html, body { font-family: "Recursive Sans"; margin: 0; height: 100%; }
+html, body { font-family: "Recursive Sans"; margin: 0; height: 100%; background: #000; color: #666; }
 #menu { position: absolute; left: 0px; top: 0px; z-index: 9; }
 #menu .item { float: left; padding: 1px 0 0 1px; }
 @media screen and (min-aspect-ratio: 1/1) { #menu .item { float: none; } }
-#menu .icon { display: block; cursor: pointer; background-color: #222; color: #fff;
+#menu .icon { display: block; cursor: pointer; background-color: #666; color: #000;
     border-radius: 30px; line-height: 30px; width: 30px; height: 30px; text-align: center; }
 
 #menu .icon .tooltip { display: none; }
@@ -24,14 +24,14 @@ html, body { font-family: "Recursive Sans"; margin: 0; height: 100%; }
 @media screen and (max-aspect-ratio: 1/1) { #menu .icon:hover .tooltip { display: block; position: absolute; top: 25px; color: #222; } }
 
 #board-container { display: flex; align-items: center; justify-content: center; height: 100%; overflow: hidden; }
-#board { width: 100vmin; height: 100vmin; background-color: #CB5; position: relative; }
+#board { width: 100vmin; height: 100vmin; background-color: #540; position: relative; }
 #lines { stroke: #0009; stroke-width: 1.5px; }
 #stars { fill: #0009; }
 
 #stones { stroke: #222; stroke-width: 2px; }
 .black { fill: #222; transform-origin: center left; }
-.white { fill: #FFF; transform-origin: center right; }
+.white { fill: #666; transform-origin: center right; }
 
 #result { position: absolute; left: 0; top: 0; width: 100vmin; height: 100vmin;
-    background: #000A; color: #FFF; text-align: center; line-height: 100vmin;
+    background: #000A; color: #666; text-align: center; line-height: 100vmin;
     font-size: 80px; }

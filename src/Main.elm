@@ -8,6 +8,7 @@ import Html.Attributes exposing (class, hidden, id, style)
 import Http
 import Process
 import Random
+import Set exposing (Set)
 import Sgf exposing (Color(..), Game, Move)
 import Svg exposing (Svg, circle, g, line, svg)
 import Svg.Attributes as SvgAttr
@@ -32,7 +33,7 @@ svgSize =
 
 edge : Float
 edge =
-    50
+    30
 
 
 cell : Float
@@ -40,9 +41,14 @@ cell =
     (svgSize - edge * 2) / toFloat (boardSize - 1)
 
 
-stoneRadius : Float
-stoneRadius =
-    cell * 0.43
+blackStoneRadius : Float
+blackStoneRadius =
+    cell * 0.48
+
+
+whiteStoneRadius : Float
+whiteStoneRadius =
+    cell * 0.49
 
 
 type Model
@@ -64,6 +70,10 @@ type Msg
     | Step
     | UrlRequested Browser.UrlRequest
     | UrlChanged Url
+
+
+type alias Board =
+    Dict.Dict ( Int, Int ) Color
 
 
 main : Program () Model Msg
@@ -235,13 +245,20 @@ menu =
 
 boardView : List Move -> Html Msg
 boardView moves =
+    let
+        stones =
+            moves
+                |> boardAfterMoves
+                |> Dict.toList
+                |> List.map boardStoneView
+    in
     svg
         [ SvgAttr.id "board"
         , SvgAttr.viewBox "0 0 1000 1000"
         ]
         [ g [ SvgAttr.id "lines" ] boardLines
         , g [ SvgAttr.id "stars" ] starPoints
-        , g [ SvgAttr.id "stones" ] (List.filterMap stoneView moves)
+        , g [ SvgAttr.id "stones" ] (stones ++ lastMoveMarker moves)
         ]
 
 
@@ -291,19 +308,147 @@ starPoints =
             )
 
 
-stoneView : Move -> Maybe (Svg Msg)
-stoneView move =
-    move.point
-        |> Maybe.map
-            (\point ->
-                circle
-                    [ SvgAttr.class (stoneClass move.color)
-                    , SvgAttr.cx (number (boardCoordinate point.x))
-                    , SvgAttr.cy (number (boardCoordinate point.y))
-                    , SvgAttr.r (number stoneRadius)
+boardStoneView : ( ( Int, Int ), Color ) -> Svg Msg
+boardStoneView ( ( x, y ), color ) =
+    circle
+        [ SvgAttr.class (stoneClass color)
+        , SvgAttr.cx (number (boardCoordinate x))
+        , SvgAttr.cy (number (boardCoordinate y))
+        , SvgAttr.r (number (stoneRadius color))
+        ]
+        []
+
+
+boardAfterMoves : List Move -> Board
+boardAfterMoves moves =
+    List.foldl applyMove Dict.empty moves
+
+
+applyMove : Move -> Board -> Board
+applyMove move board =
+    case move.point of
+        Nothing ->
+            board
+
+        Just point ->
+            let
+                position =
+                    ( point.x, point.y )
+
+                withStone =
+                    Dict.insert position move.color board
+
+                afterCaptures =
+                    position
+                        |> neighbors
+                        |> List.filter (\neighbor -> Dict.get neighbor withStone == Just (oppositeColor move.color))
+                        |> List.foldl removeGroupIfCaptured withStone
+            in
+            removeGroupIfCaptured position afterCaptures
+
+
+removeGroupIfCaptured : ( Int, Int ) -> Board -> Board
+removeGroupIfCaptured position board =
+    case Dict.get position board of
+        Nothing ->
+            board
+
+        Just color ->
+            let
+                ( group, hasLiberty ) =
+                    collectGroup board color [ position ] Set.empty False
+            in
+            if hasLiberty then
+                board
+
+            else
+                Set.foldl Dict.remove board group
+
+
+collectGroup : Board -> Color -> List ( Int, Int ) -> Set ( Int, Int ) -> Bool -> ( Set ( Int, Int ), Bool )
+collectGroup board color frontier visited hasLiberty =
+    case frontier of
+        [] ->
+            ( visited, hasLiberty )
+
+        position :: rest ->
+            if Set.member position visited then
+                collectGroup board color rest visited hasLiberty
+
+            else
+                case Dict.get position board of
+                    Just stoneColor ->
+                        if stoneColor == color then
+                            let
+                                openNeighbors =
+                                    neighbors position
+                                        |> List.filter (\neighbor -> Dict.get neighbor board == Nothing)
+
+                                sameColorNeighbors =
+                                    neighbors position
+                                        |> List.filter (\neighbor -> Dict.get neighbor board == Just color)
+                            in
+                            collectGroup board color (sameColorNeighbors ++ rest) (Set.insert position visited) (hasLiberty || not (List.isEmpty openNeighbors))
+
+                        else
+                            collectGroup board color rest visited hasLiberty
+
+                    Nothing ->
+                        collectGroup board color rest visited True
+
+
+neighbors : ( Int, Int ) -> List ( Int, Int )
+neighbors ( x, y ) =
+    [ ( x - 1, y ), ( x + 1, y ), ( x, y - 1 ), ( x, y + 1 ) ]
+        |> List.filter (\( nx, ny ) -> nx >= 0 && nx < boardSize && ny >= 0 && ny < boardSize)
+
+
+oppositeColor : Color -> Color
+oppositeColor color =
+    case color of
+        Black ->
+            White
+
+        White ->
+            Black
+
+
+lastMoveMarker : List Move -> List (Svg Msg)
+lastMoveMarker moves =
+    case lastMoveWithPoint moves of
+        Just move ->
+            case move.point of
+                Just point ->
+                    [ circle
+                        [ SvgAttr.class (oppositeStoneClass move.color)
+                        , SvgAttr.cx (number (boardCoordinate point.x))
+                        , SvgAttr.cy (number (boardCoordinate point.y))
+                        , SvgAttr.r (number (cell * 0.15))
+                        , SvgAttr.stroke "none"
+                        ]
+                        []
                     ]
+
+                Nothing ->
                     []
-            )
+
+        Nothing ->
+            []
+
+
+lastMoveWithPoint : List Move -> Maybe Move
+lastMoveWithPoint moves =
+    List.foldl
+        (\move previous ->
+            case move.point of
+                Just _ ->
+                    Just move
+
+                Nothing ->
+                    previous
+        )
+        Nothing
+        moves
 
 
 resultView : Model -> Html Msg
@@ -369,6 +514,26 @@ stoneClass color =
 
         White ->
             "white"
+
+
+oppositeStoneClass : Color -> String
+oppositeStoneClass color =
+    case color of
+        Black ->
+            "white"
+
+        White ->
+            "black"
+
+
+stoneRadius : Color -> Float
+stoneRadius color =
+    case color of
+        Black ->
+            blackStoneRadius
+
+        White ->
+            whiteStoneRadius
 
 
 boardCoordinate : Int -> Float

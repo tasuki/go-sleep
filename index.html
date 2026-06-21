@@ -24,7 +24,12 @@
     <p>Bugs to: https://github.com/tasuki/go-sleep</p>
 
     <script>
-        var app = Elm.Main.init();
+        var replaySeconds = parseInt(localStorage.getItem("replaySeconds"), 10) || 5;
+        var app = Elm.Main.init({ flags: replaySeconds });
+
+        app.ports.saveReplaySeconds.subscribe(function(seconds) {
+            localStorage.setItem("replaySeconds", seconds);
+        });
     </script>
 </body>
 </html>

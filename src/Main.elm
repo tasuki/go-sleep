@@ -1,11 +1,11 @@
-module Main exposing (main)
+port module Main exposing (main)
 
 import Browser
 import Browser.Navigation as Nav
 import Dict
-import Html exposing (Html, div, span, text)
-import Html.Attributes exposing (class, hidden, id)
-import Html.Events exposing (onClick)
+import Html exposing (Html, div, input, span, text)
+import Html.Attributes as HtmlAttr exposing (class, hidden, id, type_, value)
+import Html.Events exposing (onClick, onInput)
 import Http
 import Random
 import Set exposing (Set)
@@ -16,9 +16,9 @@ import Time
 import Url exposing (Url)
 
 
-stepDelayMilliseconds : Float
-stepDelayMilliseconds =
-    5 * 1000
+defaultReplaySeconds : Int
+defaultReplaySeconds =
+    5
 
 
 boardSize : Int
@@ -52,9 +52,9 @@ whiteStoneRadius =
 
 
 type Model
-    = Loading
+    = Loading Int
     | Playing Playback
-    | Failed String
+    | Failed Int String
 
 
 type alias Playback =
@@ -62,6 +62,8 @@ type alias Playback =
     , board : Board
     , remainingMoves : List Move
     , lastMove : Maybe Move
+    , replaySeconds : Int
+    , settingsOpen : Bool
     , showingResult : Bool
     }
 
@@ -69,6 +71,9 @@ type alias Playback =
 type Msg
     = GotSgf (Result Http.Error String)
     | PickedRecord String
+    | ToggleSettings
+    | CloseSettings
+    | SetReplaySeconds String
     | Step
     | Skip
     | UrlRequested Browser.UrlRequest
@@ -79,10 +84,13 @@ type alias Board =
     Dict.Dict ( Int, Int ) Color
 
 
-main : Program () Model Msg
+port saveReplaySeconds : Int -> Cmd msg
+
+
+main : Program Int Model Msg
 main =
     Browser.application
-        { init = \_ _ _ -> init
+        { init = \replaySeconds _ _ -> init replaySeconds
         , update = update
         , subscriptions = subscriptions
         , view = view
@@ -91,9 +99,9 @@ main =
         }
 
 
-init : ( Model, Cmd Msg )
-init =
-    ( Loading, fetchSgf )
+init : Int -> ( Model, Cmd Msg )
+init replaySeconds =
+    ( Loading (validReplaySeconds replaySeconds), fetchSgf )
 
 
 fetchSgf : Cmd Msg
@@ -124,13 +132,43 @@ update msg model =
                     source
                         |> String.lines
                         |> List.filter (String.isEmpty >> not)
-                        |> chooseRecord
+                        |> chooseRecord (replaySecondsOf model)
 
                 Err error ->
-                    ( Failed (httpErrorToString error), Cmd.none )
+                    ( Failed (replaySecondsOf model) (httpErrorToString error), Cmd.none )
 
         PickedRecord record ->
-            startGame record
+            startGame (replaySecondsOf model) record
+
+        ToggleSettings ->
+            case model of
+                Playing playback ->
+                    ( Playing { playback | settingsOpen = not playback.settingsOpen }, Cmd.none )
+
+                _ ->
+                    ( model, Cmd.none )
+
+        CloseSettings ->
+            case model of
+                Playing playback ->
+                    ( Playing { playback | settingsOpen = False }, Cmd.none )
+
+                _ ->
+                    ( model, Cmd.none )
+
+        SetReplaySeconds rawSeconds ->
+            case ( model, String.toInt rawSeconds ) of
+                ( Playing playback, Just seconds ) ->
+                    let
+                        replaySeconds =
+                            validReplaySeconds seconds
+                    in
+                    ( Playing { playback | replaySeconds = replaySeconds }
+                    , saveReplaySeconds replaySeconds
+                    )
+
+                _ ->
+                    ( model, Cmd.none )
 
         Step ->
             case model of
@@ -141,46 +179,46 @@ update msg model =
                     ( model, Cmd.none )
 
         Skip ->
-            ( Loading, fetchSgf )
+            ( Loading (replaySecondsOf model), fetchSgf )
 
 
-chooseRecord : List String -> ( Model, Cmd Msg )
-chooseRecord records =
+chooseRecord : Int -> List String -> ( Model, Cmd Msg )
+chooseRecord replaySeconds records =
     case records of
         [] ->
-            ( Failed "boring.sgf did not contain any records", Cmd.none )
+            ( Failed replaySeconds "boring.sgf did not contain any records", Cmd.none )
 
         first :: rest ->
-            ( Loading
+            ( Loading replaySeconds
             , Random.generate PickedRecord (Random.uniform first rest)
             )
 
 
-startGame : String -> ( Model, Cmd Msg )
-startGame record =
+startGame : Int -> String -> ( Model, Cmd Msg )
+startGame replaySeconds record =
     case Sgf.parse record of
         Ok [ game ] ->
-            playGame game
+            playGame replaySeconds game
 
         Ok (game :: _) ->
-            playGame game
+            playGame replaySeconds game
 
         Ok [] ->
-            ( Failed "randomly selected record did not contain a game", Cmd.none )
+            ( Failed replaySeconds "randomly selected record did not contain a game", Cmd.none )
 
         Err message ->
-            ( Failed message, Cmd.none )
+            ( Failed replaySeconds message, Cmd.none )
 
 
-playGame : Game -> ( Model, Cmd Msg )
-playGame game =
-    ( Playing (initialPlayback game)
+playGame : Int -> Game -> ( Model, Cmd Msg )
+playGame replaySeconds game =
+    ( Playing (initialPlayback replaySeconds game)
     , Cmd.none
     )
 
 
-initialPlayback : Game -> Playback
-initialPlayback game =
+initialPlayback : Int -> Game -> Playback
+initialPlayback replaySeconds game =
     let
         ( board, remainingMoves, lastMove ) =
             case game.moves of
@@ -194,6 +232,8 @@ initialPlayback game =
     , board = board
     , remainingMoves = remainingMoves
     , lastMove = lastMove
+    , replaySeconds = replaySeconds
+    , settingsOpen = False
     , showingResult = False
     }
 
@@ -218,7 +258,7 @@ stepPlayback playback =
                 )
 
             else
-                ( Loading, fetchSgf )
+                ( Loading playback.replaySeconds, fetchSgf )
 
 
 rememberLastMove : Move -> Maybe Move -> Maybe Move
@@ -234,8 +274,12 @@ rememberLastMove move previous =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     case model of
-        Playing _ ->
-            Time.every stepDelayMilliseconds (\_ -> Step)
+        Playing playback ->
+            if playback.settingsOpen then
+                Sub.none
+
+            else
+                Time.every (toFloat playback.replaySeconds * 1000) (\_ -> Step)
 
         _ ->
             Sub.none
@@ -248,6 +292,7 @@ view model =
         [ menu
         , div [ id "board-container" ]
             [ boardView (visibleBoard model) (visibleLastMove model)
+            , settingsView model
             , resultView model
             ]
         ]
@@ -258,7 +303,7 @@ menu : Html Msg
 menu =
     div [ id "menu" ]
         [ div [ class "item" ]
-            [ div [ class "icon" ]
+            [ div [ class "icon", onClick ToggleSettings ]
                 [ text "o"
                 , span [ class "tooltip" ] [ text " settings" ]
                 ]
@@ -270,6 +315,44 @@ menu =
                 ]
             ]
         ]
+
+
+settingsView : Model -> Html Msg
+settingsView model =
+    case model of
+        Playing playback ->
+            div []
+                [ div
+                    [ id "close-settings-area"
+                    , hidden (not playback.settingsOpen)
+                    , onClick CloseSettings
+                    ]
+                    []
+                , div
+                    [ id "settings-overlay"
+                    , hidden (not playback.settingsOpen)
+                    ]
+                    [ div [ class "outside-board", onClick CloseSettings ] []
+                    , div [ class "settings-board" ]
+                        [ div [ class "setting" ]
+                            [ div [] [ text ("Replay speed: " ++ String.fromInt playback.replaySeconds ++ " seconds per move") ]
+                            , input
+                                [ type_ "range"
+                                , HtmlAttr.min "1"
+                                , HtmlAttr.max "10"
+                                , HtmlAttr.step "1"
+                                , value (String.fromInt playback.replaySeconds)
+                                , onInput SetReplaySeconds
+                                ]
+                                []
+                            ]
+                        ]
+                    , div [ class "outside-board", onClick CloseSettings ] []
+                    ]
+                ]
+
+        _ ->
+            div [] []
 
 
 boardView : Board -> Maybe Move -> Html Msg
@@ -460,7 +543,7 @@ resultView model =
                 ]
                 [ text (formatResult playback.game) ]
 
-        Failed message ->
+        Failed _ message ->
             div [ id "result" ] [ text message ]
 
         _ ->
@@ -485,6 +568,24 @@ visibleLastMove model =
 
         _ ->
             Nothing
+
+
+replaySecondsOf : Model -> Int
+replaySecondsOf model =
+    case model of
+        Loading replaySeconds ->
+            replaySeconds
+
+        Playing playback ->
+            playback.replaySeconds
+
+        Failed replaySeconds _ ->
+            replaySeconds
+
+
+validReplaySeconds : Int -> Int
+validReplaySeconds replaySeconds =
+    clamp 1 10 replaySeconds
 
 
 formatResult : Game -> String

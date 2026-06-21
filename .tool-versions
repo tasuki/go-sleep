@@ -1,4 +1,4 @@
 python 3.13.5
 elm 0.19.1
-node lts
+node 20.19.2
 npm:elm-test 0.19.1-revision17

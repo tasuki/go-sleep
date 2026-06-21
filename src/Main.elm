@@ -422,26 +422,16 @@ settingsView model =
                         [ div [ class "setting" ]
                             [ div [] [ text "Collection" ]
                             , div [ class "collections" ]
-                                [ label []
-                                    [ input
-                                        [ type_ "radio"
-                                        , name "collection"
-                                        , checked (playback.settings.collection == Boring)
-                                        , onClick (SetCollection "boring")
-                                        ]
-                                        []
-                                    , text " boring"
+                                [ span
+                                    [ class (optionClass (playback.settings.collection == Boring))
+                                    , onClick (SetCollection "boring")
                                     ]
-                                , label []
-                                    [ input
-                                        [ type_ "radio"
-                                        , name "collection"
-                                        , checked (playback.settings.collection == Exciting)
-                                        , onClick (SetCollection "exciting")
-                                        ]
-                                        []
-                                    , text " exciting"
+                                    [ text "boring" ]
+                                , span
+                                    [ class (optionClass (playback.settings.collection == Exciting))
+                                    , onClick (SetCollection "exciting")
                                     ]
+                                    [ text "exciting" ]
                                 ]
                             , div [] [ text ("Replay speed: " ++ String.fromInt playback.settings.replaySeconds ++ " seconds per move") ]
                             , input
@@ -455,26 +445,16 @@ settingsView model =
                                 []
                             , div [] [ text "Theme" ]
                             , div [ class "themes" ]
-                                [ label []
-                                    [ input
-                                        [ type_ "radio"
-                                        , name "theme"
-                                        , checked (playback.settings.theme == Night)
-                                        , onClick (SetTheme "night")
-                                        ]
-                                        []
-                                    , text " night"
+                                [ span
+                                    [ class (optionClass (playback.settings.theme == Night))
+                                    , onClick (SetTheme "night")
                                     ]
-                                , label []
-                                    [ input
-                                        [ type_ "radio"
-                                        , name "theme"
-                                        , checked (playback.settings.theme == Day)
-                                        , onClick (SetTheme "day")
-                                        ]
-                                        []
-                                    , text " day"
+                                    [ text "night" ]
+                                , span
+                                    [ class (optionClass (playback.settings.theme == Day))
+                                    , onClick (SetTheme "day")
                                     ]
+                                    [ text "day" ]
                                 ]
                             ]
                         ]
@@ -791,6 +771,15 @@ formatResult game =
 
     else
         raw
+
+
+optionClass : Bool -> String
+optionClass active =
+    if active then
+        "option active"
+
+    else
+        "option"
 
 
 stoneClass : Color -> String

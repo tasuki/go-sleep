@@ -75,9 +75,9 @@ html, body { font-family: "Recursive Sans"; margin: 0; height: 100%; color-schem
 #settings-overlay .setting { width: 80%; text-align: center; font-size: 24px; }
 #settings-overlay input { width: 100%; margin: 8px 0 20px; background: var(--control-background); color: var(--text); }
 #settings-overlay .themes,
-#settings-overlay .collections { display: flex; flex-wrap: wrap; justify-content: center; gap: 30px; margin-top: 8px; }
-#settings-overlay .themes input,
-#settings-overlay .collections input { width: auto; margin: 0 4px 0 0; }
+#settings-overlay .collections { display: flex; flex-wrap: wrap; justify-content: center; gap: 30px; margin: 8px 0 20px; }
+#settings-overlay .option { cursor: pointer; }
+#settings-overlay .option.active { font-weight: 700; cursor: default; }
 
 #result { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 100vmin; height: 100vmin;
     background: var(--overlay); color: var(--text); text-align: center; line-height: 100vmin;

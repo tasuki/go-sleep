@@ -140,20 +140,14 @@ parseProperties properties source index =
             skipWhitespace source index
     in
     case charAt next source of
-        Just ';' ->
-            Ok ( List.reverse properties, next )
-
-        Just ')' ->
-            Ok ( List.reverse properties, next )
-
-        Just '(' ->
-            Ok ( List.reverse properties, next )
-
         Nothing ->
             Ok ( List.reverse properties, next )
 
         Just c ->
-            if Char.isUpper c then
+            if isPropertyTerminator c then
+                Ok ( List.reverse properties, next )
+
+            else if Char.isUpper c then
                 case parseProperty source next of
                     Ok ( property, afterProperty ) ->
                         parseProperties (property :: properties) source afterProperty
@@ -209,14 +203,14 @@ parseValue source index =
     valueLoop [] source (index + 1)
 
 
-valueLoop : List String -> Parser String
-valueLoop chunks source index =
+valueLoop : List Char -> Parser String
+valueLoop chars source index =
     case charAt index source of
         Nothing ->
             Err "unexpected end of SGF inside property value"
 
         Just ']' ->
-            Ok ( String.concat (List.reverse chunks), index + 1 )
+            Ok ( String.fromList (List.reverse chars), index + 1 )
 
         Just '\\' ->
             case charAt (index + 1) source of
@@ -224,10 +218,10 @@ valueLoop chunks source index =
                     Err "unexpected end of SGF after escape"
 
                 Just escaped ->
-                    valueLoop (String.fromChar escaped :: chunks) source (index + 2)
+                    valueLoop (escaped :: chars) source (index + 2)
 
         Just c ->
-            valueLoop (String.fromChar c :: chunks) source (index + 1)
+            valueLoop (c :: chars) source (index + 1)
 
 
 rootProperties : List Node -> Dict String (List String)
@@ -244,14 +238,7 @@ rootProperties nodes =
 
 movesFromNodes : List Node -> List Move
 movesFromNodes nodes =
-    nodes
-        |> List.concatMap movesFromNode
-
-
-movesFromNode : Node -> List Move
-movesFromNode node =
-    node
-        |> List.filterMap moveFromProperty
+    List.concatMap (List.filterMap moveFromProperty) nodes
 
 
 moveFromProperty : Property -> Maybe Move
@@ -309,23 +296,28 @@ isWhitespace c =
     c == ' ' || c == '\n' || c == '\r' || c == '\t'
 
 
+isPropertyTerminator : Char -> Bool
+isPropertyTerminator c =
+    c == ';' || c == ')' || c == '('
+
+
 takeWhile : (Char -> Bool) -> String -> Int -> ( String, Int )
 takeWhile predicate source index =
     takeWhileHelp predicate source index []
 
 
-takeWhileHelp : (Char -> Bool) -> String -> Int -> List String -> ( String, Int )
-takeWhileHelp predicate source index chunks =
+takeWhileHelp : (Char -> Bool) -> String -> Int -> List Char -> ( String, Int )
+takeWhileHelp predicate source index chars =
     case charAt index source of
         Just c ->
             if predicate c then
-                takeWhileHelp predicate source (index + 1) (String.fromChar c :: chunks)
+                takeWhileHelp predicate source (index + 1) (c :: chars)
 
             else
-                ( String.concat (List.reverse chunks), index )
+                ( String.fromList (List.reverse chars), index )
 
         Nothing ->
-            ( String.concat (List.reverse chunks), index )
+            ( String.fromList (List.reverse chars), index )
 
 
 charAt : Int -> String -> Maybe Char

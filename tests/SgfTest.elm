@@ -1,8 +1,8 @@
 module SgfTest exposing (suite)
 
 import Dict
-import Expect
-import Sgf exposing (Color(..))
+import Expect exposing (Expectation)
+import Sgf exposing (Color(..), Game)
 import Test exposing (Test, describe, test)
 
 
@@ -18,55 +18,56 @@ suite =
             \_ ->
                 case Sgf.parse sample of
                     Ok games ->
-                        games
-                            |> List.length
-                            |> Expect.equal 2
+                        Expect.equal 2 (List.length games)
 
                     Err message ->
                         Expect.fail message
         , test "reads root properties" <|
             \_ ->
-                case Sgf.parse sample of
-                    Ok (game :: _) ->
-                        game.properties
-                            |> Dict.get "GN"
-                            |> Expect.equal (Just [ "001DB3210C08C3CC6FF8D73FBA76456F" ])
-
-                    Ok [] ->
-                        Expect.fail "expected at least one game"
-
-                    Err message ->
-                        Expect.fail message
+                expectFirstSampleGame <|
+                    \game ->
+                        Expect.equal (Just [ "001DB3210C08C3CC6FF8D73FBA76456F" ]) (Dict.get "GN" game.properties)
         , test "reads moves with zero-based coordinates" <|
             \_ ->
-                case Sgf.parse sample of
-                    Ok (game :: _) ->
-                        game.moves
-                            |> List.take 3
-                            |> Expect.equal
-                                [ { color = Black, point = Just { x = 3, y = 3 }, raw = "dd" }
-                                , { color = White, point = Just { x = 3, y = 15 }, raw = "dp" }
-                                , { color = Black, point = Just { x = 15, y = 15 }, raw = "pp" }
-                                ]
-
-                    Ok [] ->
-                        Expect.fail "expected at least one game"
-
-                    Err message ->
-                        Expect.fail message
+                expectFirstSampleGame <|
+                    \game ->
+                        Expect.equal
+                            [ { color = Black, point = Just { x = 3, y = 3 }, raw = "dd" }
+                            , { color = White, point = Just { x = 3, y = 15 }, raw = "dp" }
+                            , { color = Black, point = Just { x = 15, y = 15 }, raw = "pp" }
+                            ]
+                            (List.take 3 game.moves)
         , test "unescapes property values" <|
             \_ ->
-                case Sgf.parse "(;C[hello\\] there\\\\ friend];B[])" of
-                    Ok [ game ] ->
-                        Expect.all
-                            [ \g -> g.properties |> Dict.get "C" |> Expect.equal (Just [ "hello] there\\ friend" ])
-                            , \g -> g.moves |> Expect.equal [ { color = Black, point = Nothing, raw = "" } ]
-                            ]
-                            game
-
-                    Ok games ->
-                        Expect.fail ("expected one game, got " ++ String.fromInt (List.length games))
-
-                    Err message ->
-                        Expect.fail message
+                expectSingleGame "(;C[hello\\] there\\\\ friend];B[])" <|
+                    Expect.all
+                        [ \game -> Expect.equal (Just [ "hello] there\\ friend" ]) (Dict.get "C" game.properties)
+                        , \game -> Expect.equal [ { color = Black, point = Nothing, raw = "" } ] game.moves
+                        ]
         ]
+
+
+expectFirstSampleGame : (Game -> Expectation) -> Expectation
+expectFirstSampleGame assertion =
+    case Sgf.parse sample of
+        Ok (game :: _) ->
+            assertion game
+
+        Ok [] ->
+            Expect.fail "expected at least one game"
+
+        Err message ->
+            Expect.fail message
+
+
+expectSingleGame : String -> (Game -> Expectation) -> Expectation
+expectSingleGame source assertion =
+    case Sgf.parse source of
+        Ok [ game ] ->
+            assertion game
+
+        Ok games ->
+            Expect.fail ("expected one game, got " ++ String.fromInt (List.length games))
+
+        Err message ->
+            Expect.fail message

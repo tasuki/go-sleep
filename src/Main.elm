@@ -181,22 +181,21 @@ playGame game =
 
 initialPlayback : Game -> Playback
 initialPlayback game =
-    case game.moves of
-        firstMove :: rest ->
-            { game = game
-            , board = applyMove firstMove Dict.empty
-            , remainingMoves = rest
-            , lastMove = rememberLastMove firstMove Nothing
-            , showingResult = False
-            }
+    let
+        ( board, remainingMoves, lastMove ) =
+            case game.moves of
+                firstMove :: rest ->
+                    ( applyMove firstMove Dict.empty, rest, rememberLastMove firstMove Nothing )
 
-        [] ->
-            { game = game
-            , board = Dict.empty
-            , remainingMoves = []
-            , lastMove = Nothing
-            , showingResult = False
-            }
+                [] ->
+                    ( Dict.empty, [], Nothing )
+    in
+    { game = game
+    , board = board
+    , remainingMoves = remainingMoves
+    , lastMove = lastMove
+    , showingResult = False
+    }
 
 
 stepPlayback : Playback -> ( Model, Cmd Msg )
@@ -275,19 +274,14 @@ menu =
 
 boardView : Board -> Maybe Move -> Html Msg
 boardView board lastMove =
-    let
-        stones =
-            board
-                |> Dict.toList
-                |> List.map boardStoneView
-    in
     svg
         [ SvgAttr.id "board"
         , SvgAttr.viewBox "0 0 1000 1000"
         ]
         [ g [ SvgAttr.id "lines" ] boardLines
         , g [ SvgAttr.id "stars" ] starPoints
-        , g [ SvgAttr.id "stones" ] (stones ++ lastMoveMarker lastMove)
+        , g [ SvgAttr.id "stones" ]
+            (List.map boardStoneView (Dict.toList board) ++ lastMoveMarker lastMove)
         ]
 
 
@@ -348,11 +342,6 @@ boardStoneView ( ( x, y ), color ) =
         []
 
 
-boardAfterMoves : List Move -> Board
-boardAfterMoves moves =
-    List.foldl applyMove Dict.empty moves
-
-
 applyMove : Move -> Board -> Board
 applyMove move board =
     case move.point of
@@ -409,15 +398,16 @@ collectGroup board color frontier visited hasLiberty =
                     Just stoneColor ->
                         if stoneColor == color then
                             let
-                                openNeighbors =
+                                neighborPositions =
                                     neighbors position
-                                        |> List.filter (\neighbor -> Dict.get neighbor board == Nothing)
+
+                                hasOpenNeighbor =
+                                    List.any (\neighbor -> Dict.get neighbor board == Nothing) neighborPositions
 
                                 sameColorNeighbors =
-                                    neighbors position
-                                        |> List.filter (\neighbor -> Dict.get neighbor board == Just color)
+                                    List.filter (\neighbor -> Dict.get neighbor board == Just color) neighborPositions
                             in
-                            collectGroup board color (sameColorNeighbors ++ rest) (Set.insert position visited) (hasLiberty || not (List.isEmpty openNeighbors))
+                            collectGroup board color (sameColorNeighbors ++ rest) (Set.insert position visited) (hasLiberty || hasOpenNeighbor)
 
                         else
                             collectGroup board color rest visited hasLiberty
@@ -444,22 +434,17 @@ oppositeColor color =
 
 lastMoveMarker : Maybe Move -> List (Svg Msg)
 lastMoveMarker lastMove =
-    case lastMove of
-        Just move ->
-            case move.point of
-                Just point ->
-                    [ circle
-                        [ SvgAttr.class (oppositeStoneClass move.color)
-                        , SvgAttr.cx (number (boardCoordinate point.x))
-                        , SvgAttr.cy (number (boardCoordinate point.y))
-                        , SvgAttr.r (number (cell * 0.15))
-                        , SvgAttr.stroke "none"
-                        ]
-                        []
-                    ]
-
-                Nothing ->
-                    []
+    case lastMove |> Maybe.andThen (\move -> Maybe.map (Tuple.pair move) move.point) of
+        Just ( move, point ) ->
+            [ circle
+                [ SvgAttr.class (oppositeStoneClass move.color)
+                , SvgAttr.cx (number (boardCoordinate point.x))
+                , SvgAttr.cy (number (boardCoordinate point.y))
+                , SvgAttr.r (number (cell * 0.15))
+                , SvgAttr.stroke "none"
+                ]
+                []
+            ]
 
         Nothing ->
             []

@@ -428,7 +428,8 @@ settingsView model =
                     [ div [ class "outside-board", onClick CloseSettings ] []
                     , div [ class "settings-board" ]
                         [ div [ class "setting" ]
-                            [ div [] [ text "Collection" ]
+                            [ div [ class "game-name" ] [ text (gameName playback.game) ]
+                            , div [] [ text "Collection" ]
                             , div [ class "collections" ]
                                 [ span
                                     [ class (optionClass (playback.settings.collection == Boring))
@@ -763,6 +764,14 @@ themeToString theme =
 
         Day ->
             "day"
+
+
+gameName : Game -> String
+gameName game =
+    game.properties
+        |> Dict.get "GN"
+        |> Maybe.andThen List.head
+        |> Maybe.withDefault "Untitled game"
 
 
 formatResult : Game -> String

@@ -73,6 +73,7 @@ html, body { font-family: "Recursive Sans"; margin: 0; height: 100%; color-schem
 #settings-overlay .outside-board { flex: 1; min-height: 0; }
 #settings-overlay .settings-board { width: 100%; height: 100vmin; display: flex; align-items: center; justify-content: center; }
 #settings-overlay .setting { width: 80%; text-align: center; font-size: 24px; }
+#settings-overlay .game-name { font-weight: 700; margin-bottom: 20px; overflow: hidden; }
 #settings-overlay input { width: 100%; margin: 8px 0 20px; background: var(--control-background); color: var(--text); }
 #settings-overlay .themes,
 #settings-overlay .collections { display: flex; flex-wrap: wrap; justify-content: center; gap: 30px; margin: 8px 0 20px; }

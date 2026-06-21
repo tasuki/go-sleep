@@ -3,8 +3,8 @@ port module Main exposing (main)
 import Browser
 import Browser.Navigation as Nav
 import Dict
-import Html exposing (Html, div, input, span, text)
-import Html.Attributes as HtmlAttr exposing (class, hidden, id, type_, value)
+import Html exposing (Html, div, input, label, span, text)
+import Html.Attributes as HtmlAttr exposing (checked, class, hidden, id, name, type_, value)
 import Html.Events exposing (onClick, onInput)
 import Http
 import Random
@@ -52,9 +52,20 @@ whiteStoneRadius =
 
 
 type Model
-    = Loading Int
+    = Loading Settings
     | Playing Playback
-    | Failed Int String
+    | Failed Settings String
+
+
+type alias Settings =
+    { replaySeconds : Int
+    , theme : Theme
+    }
+
+
+type Theme
+    = Night
+    | Day
 
 
 type alias Playback =
@@ -62,7 +73,7 @@ type alias Playback =
     , board : Board
     , remainingMoves : List Move
     , lastMove : Maybe Move
-    , replaySeconds : Int
+    , settings : Settings
     , settingsOpen : Bool
     , showingResult : Bool
     }
@@ -74,6 +85,7 @@ type Msg
     | ToggleSettings
     | CloseSettings
     | SetReplaySeconds String
+    | SetTheme String
     | Step
     | Skip
     | UrlRequested Browser.UrlRequest
@@ -87,7 +99,16 @@ type alias Board =
 port saveReplaySeconds : Int -> Cmd msg
 
 
-main : Program Int Model Msg
+port saveTheme : String -> Cmd msg
+
+
+type alias Flags =
+    { replaySeconds : Int
+    , theme : String
+    }
+
+
+main : Program Flags Model Msg
 main =
     Browser.application
         { init = \replaySeconds _ _ -> init replaySeconds
@@ -99,9 +120,9 @@ main =
         }
 
 
-init : Int -> ( Model, Cmd Msg )
-init replaySeconds =
-    ( Loading (validReplaySeconds replaySeconds), fetchSgf )
+init : Flags -> ( Model, Cmd Msg )
+init flags =
+    ( Loading (settingsFromFlags flags), fetchSgf )
 
 
 fetchSgf : Cmd Msg
@@ -132,13 +153,13 @@ update msg model =
                     source
                         |> String.lines
                         |> List.filter (String.isEmpty >> not)
-                        |> chooseRecord (replaySecondsOf model)
+                        |> chooseRecord (settingsOf model)
 
                 Err error ->
-                    ( Failed (replaySecondsOf model) (httpErrorToString error), Cmd.none )
+                    ( Failed (settingsOf model) (httpErrorToString error), Cmd.none )
 
         PickedRecord record ->
-            startGame (replaySecondsOf model) record
+            startGame (settingsOf model) record
 
         ToggleSettings ->
             case model of
@@ -160,11 +181,31 @@ update msg model =
             case ( model, String.toInt rawSeconds ) of
                 ( Playing playback, Just seconds ) ->
                     let
+                        settings =
+                            playback.settings
+
                         replaySeconds =
                             validReplaySeconds seconds
                     in
-                    ( Playing { playback | replaySeconds = replaySeconds }
+                    ( Playing { playback | settings = { settings | replaySeconds = replaySeconds } }
                     , saveReplaySeconds replaySeconds
+                    )
+
+                _ ->
+                    ( model, Cmd.none )
+
+        SetTheme rawTheme ->
+            case model of
+                Playing playback ->
+                    let
+                        settings =
+                            playback.settings
+
+                        theme =
+                            themeFromString rawTheme
+                    in
+                    ( Playing { playback | settings = { settings | theme = theme } }
+                    , saveTheme (themeToString theme)
                     )
 
                 _ ->
@@ -179,46 +220,46 @@ update msg model =
                     ( model, Cmd.none )
 
         Skip ->
-            ( Loading (replaySecondsOf model), fetchSgf )
+            ( Loading (settingsOf model), fetchSgf )
 
 
-chooseRecord : Int -> List String -> ( Model, Cmd Msg )
-chooseRecord replaySeconds records =
+chooseRecord : Settings -> List String -> ( Model, Cmd Msg )
+chooseRecord settings records =
     case records of
         [] ->
-            ( Failed replaySeconds "boring.sgf did not contain any records", Cmd.none )
+            ( Failed settings "boring.sgf did not contain any records", Cmd.none )
 
         first :: rest ->
-            ( Loading replaySeconds
+            ( Loading settings
             , Random.generate PickedRecord (Random.uniform first rest)
             )
 
 
-startGame : Int -> String -> ( Model, Cmd Msg )
-startGame replaySeconds record =
+startGame : Settings -> String -> ( Model, Cmd Msg )
+startGame settings record =
     case Sgf.parse record of
         Ok [ game ] ->
-            playGame replaySeconds game
+            playGame settings game
 
         Ok (game :: _) ->
-            playGame replaySeconds game
+            playGame settings game
 
         Ok [] ->
-            ( Failed replaySeconds "randomly selected record did not contain a game", Cmd.none )
+            ( Failed settings "randomly selected record did not contain a game", Cmd.none )
 
         Err message ->
-            ( Failed replaySeconds message, Cmd.none )
+            ( Failed settings message, Cmd.none )
 
 
-playGame : Int -> Game -> ( Model, Cmd Msg )
-playGame replaySeconds game =
-    ( Playing (initialPlayback replaySeconds game)
+playGame : Settings -> Game -> ( Model, Cmd Msg )
+playGame settings game =
+    ( Playing (initialPlayback settings game)
     , Cmd.none
     )
 
 
-initialPlayback : Int -> Game -> Playback
-initialPlayback replaySeconds game =
+initialPlayback : Settings -> Game -> Playback
+initialPlayback settings game =
     let
         ( board, remainingMoves, lastMove ) =
             case game.moves of
@@ -232,7 +273,7 @@ initialPlayback replaySeconds game =
     , board = board
     , remainingMoves = remainingMoves
     , lastMove = lastMove
-    , replaySeconds = replaySeconds
+    , settings = settings
     , settingsOpen = False
     , showingResult = False
     }
@@ -258,7 +299,7 @@ stepPlayback playback =
                 )
 
             else
-                ( Loading playback.replaySeconds, fetchSgf )
+                ( Loading playback.settings, fetchSgf )
 
 
 rememberLastMove : Move -> Maybe Move -> Maybe Move
@@ -279,7 +320,7 @@ subscriptions model =
                 Sub.none
 
             else
-                Time.every (toFloat playback.replaySeconds * 1000) (\_ -> Step)
+                Time.every (toFloat playback.settings.replaySeconds * 1000) (\_ -> Step)
 
         _ ->
             Sub.none
@@ -289,11 +330,13 @@ view : Model -> Browser.Document Msg
 view model =
     { title = "Go Sleep"
     , body =
-        [ menu
-        , div [ id "board-container" ]
-            [ boardView (visibleBoard model) (visibleLastMove model)
-            , settingsView model
-            , resultView model
+        [ div [ id "app", class ("theme-" ++ themeToString (settingsOf model).theme) ]
+            [ menu
+            , div [ id "board-container" ]
+                [ boardView (visibleBoard model) (visibleLastMove model)
+                , settingsView model
+                , resultView model
+                ]
             ]
         ]
     }
@@ -335,16 +378,39 @@ settingsView model =
                     [ div [ class "outside-board", onClick CloseSettings ] []
                     , div [ class "settings-board" ]
                         [ div [ class "setting" ]
-                            [ div [] [ text ("Replay speed: " ++ String.fromInt playback.replaySeconds ++ " seconds per move") ]
+                            [ div [] [ text ("Replay speed: " ++ String.fromInt playback.settings.replaySeconds ++ " seconds per move") ]
                             , input
                                 [ type_ "range"
                                 , HtmlAttr.min "1"
                                 , HtmlAttr.max "10"
                                 , HtmlAttr.step "1"
-                                , value (String.fromInt playback.replaySeconds)
+                                , value (String.fromInt playback.settings.replaySeconds)
                                 , onInput SetReplaySeconds
                                 ]
                                 []
+                            , div [] [ text "Theme" ]
+                            , div [ class "themes" ]
+                                [ label []
+                                    [ input
+                                        [ type_ "radio"
+                                        , name "theme"
+                                        , checked (playback.settings.theme == Night)
+                                        , onClick (SetTheme "night")
+                                        ]
+                                        []
+                                    , text " night"
+                                    ]
+                                , label []
+                                    [ input
+                                        [ type_ "radio"
+                                        , name "theme"
+                                        , checked (playback.settings.theme == Day)
+                                        , onClick (SetTheme "day")
+                                        ]
+                                        []
+                                    , text " day"
+                                    ]
+                                ]
                             ]
                         ]
                     , div [ class "outside-board", onClick CloseSettings ] []
@@ -570,22 +636,49 @@ visibleLastMove model =
             Nothing
 
 
-replaySecondsOf : Model -> Int
-replaySecondsOf model =
+settingsOf : Model -> Settings
+settingsOf model =
     case model of
-        Loading replaySeconds ->
-            replaySeconds
+        Loading settings ->
+            settings
 
         Playing playback ->
-            playback.replaySeconds
+            playback.settings
 
-        Failed replaySeconds _ ->
-            replaySeconds
+        Failed settings _ ->
+            settings
+
+
+settingsFromFlags : Flags -> Settings
+settingsFromFlags flags =
+    { replaySeconds = validReplaySeconds flags.replaySeconds
+    , theme = themeFromString flags.theme
+    }
 
 
 validReplaySeconds : Int -> Int
 validReplaySeconds replaySeconds =
     clamp 1 10 replaySeconds
+
+
+themeFromString : String -> Theme
+themeFromString rawTheme =
+    case rawTheme of
+        "day" ->
+            Day
+
+        _ ->
+            Night
+
+
+themeToString : Theme -> String
+themeToString theme =
+    case theme of
+        Night ->
+            "night"
+
+        Day ->
+            "day"
 
 
 formatResult : Game -> String

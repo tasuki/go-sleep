@@ -24,11 +24,19 @@
     <p>Bugs to: https://github.com/tasuki/go-sleep</p>
 
     <script>
-        var replaySeconds = parseInt(localStorage.getItem("replaySeconds"), 10) || 5;
-        var app = Elm.Main.init({ flags: replaySeconds });
+        var app = Elm.Main.init({
+            flags: {
+                replaySeconds: parseInt(localStorage.getItem("replaySeconds"), 10) || 5,
+                theme: localStorage.getItem("theme") || "night",
+            }
+        });
 
         app.ports.saveReplaySeconds.subscribe(function(seconds) {
             localStorage.setItem("replaySeconds", seconds);
+        });
+
+        app.ports.saveTheme.subscribe(function(theme) {
+            localStorage.setItem("theme", theme);
         });
     </script>
 </body>

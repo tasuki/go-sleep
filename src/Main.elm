@@ -58,9 +58,15 @@ type Model
 
 
 type alias Settings =
-    { replaySeconds : Int
+    { collection : Collection
+    , replaySeconds : Int
     , theme : Theme
     }
+
+
+type Collection
+    = Boring
+    | Exciting
 
 
 type Theme
@@ -84,6 +90,7 @@ type Msg
     | PickedRecord String
     | ToggleSettings
     | CloseSettings
+    | SetCollection String
     | SetReplaySeconds String
     | SetTheme String
     | Step
@@ -96,6 +103,9 @@ type alias Board =
     Dict.Dict ( Int, Int ) Color
 
 
+port saveCollection : String -> Cmd msg
+
+
 port saveReplaySeconds : Int -> Cmd msg
 
 
@@ -103,7 +113,8 @@ port saveTheme : String -> Cmd msg
 
 
 type alias Flags =
-    { replaySeconds : Int
+    { collection : String
+    , replaySeconds : Int
     , theme : String
     }
 
@@ -122,13 +133,17 @@ main =
 
 init : Flags -> ( Model, Cmd Msg )
 init flags =
-    ( Loading (settingsFromFlags flags), fetchSgf )
+    let
+        settings =
+            settingsFromFlags flags
+    in
+    ( Loading settings, fetchSgf settings )
 
 
-fetchSgf : Cmd Msg
-fetchSgf =
+fetchSgf : Settings -> Cmd Msg
+fetchSgf settings =
     Http.get
-        { url = "public/boring.sgf"
+        { url = collectionUrl settings.collection
         , expect = Http.expectString GotSgf
         }
 
@@ -177,6 +192,29 @@ update msg model =
                 _ ->
                     ( model, Cmd.none )
 
+        SetCollection rawCollection ->
+            case model of
+                Playing playback ->
+                    let
+                        settings =
+                            playback.settings
+
+                        collection =
+                            collectionFromString rawCollection
+
+                        newSettings =
+                            { settings | collection = collection }
+                    in
+                    ( Loading newSettings
+                    , Cmd.batch
+                        [ saveCollection (collectionToString collection)
+                        , fetchSgf newSettings
+                        ]
+                    )
+
+                _ ->
+                    ( model, Cmd.none )
+
         SetReplaySeconds rawSeconds ->
             case ( model, String.toInt rawSeconds ) of
                 ( Playing playback, Just seconds ) ->
@@ -220,14 +258,18 @@ update msg model =
                     ( model, Cmd.none )
 
         Skip ->
-            ( Loading (settingsOf model), fetchSgf )
+            let
+                settings =
+                    settingsOf model
+            in
+            ( Loading settings, fetchSgf settings )
 
 
 chooseRecord : Settings -> List String -> ( Model, Cmd Msg )
 chooseRecord settings records =
     case records of
         [] ->
-            ( Failed settings "boring.sgf did not contain any records", Cmd.none )
+            ( Failed settings (collectionFileName settings.collection ++ " did not contain any records"), Cmd.none )
 
         first :: rest ->
             ( Loading settings
@@ -299,7 +341,7 @@ stepPlayback playback =
                 )
 
             else
-                ( Loading playback.settings, fetchSgf )
+                ( Loading playback.settings, fetchSgf playback.settings )
 
 
 rememberLastMove : Move -> Maybe Move -> Maybe Move
@@ -378,7 +420,30 @@ settingsView model =
                     [ div [ class "outside-board", onClick CloseSettings ] []
                     , div [ class "settings-board" ]
                         [ div [ class "setting" ]
-                            [ div [] [ text ("Replay speed: " ++ String.fromInt playback.settings.replaySeconds ++ " seconds per move") ]
+                            [ div [] [ text "Collection" ]
+                            , div [ class "collections" ]
+                                [ label []
+                                    [ input
+                                        [ type_ "radio"
+                                        , name "collection"
+                                        , checked (playback.settings.collection == Boring)
+                                        , onClick (SetCollection "boring")
+                                        ]
+                                        []
+                                    , text " boring"
+                                    ]
+                                , label []
+                                    [ input
+                                        [ type_ "radio"
+                                        , name "collection"
+                                        , checked (playback.settings.collection == Exciting)
+                                        , onClick (SetCollection "exciting")
+                                        ]
+                                        []
+                                    , text " exciting"
+                                    ]
+                                ]
+                            , div [] [ text ("Replay speed: " ++ String.fromInt playback.settings.replaySeconds ++ " seconds per move") ]
                             , input
                                 [ type_ "range"
                                 , HtmlAttr.min "1"
@@ -651,7 +716,8 @@ settingsOf model =
 
 settingsFromFlags : Flags -> Settings
 settingsFromFlags flags =
-    { replaySeconds = validReplaySeconds flags.replaySeconds
+    { collection = collectionFromString flags.collection
+    , replaySeconds = validReplaySeconds flags.replaySeconds
     , theme = themeFromString flags.theme
     }
 
@@ -659,6 +725,36 @@ settingsFromFlags flags =
 validReplaySeconds : Int -> Int
 validReplaySeconds replaySeconds =
     clamp 1 10 replaySeconds
+
+
+collectionFromString : String -> Collection
+collectionFromString rawCollection =
+    case rawCollection of
+        "exciting" ->
+            Exciting
+
+        _ ->
+            Boring
+
+
+collectionToString : Collection -> String
+collectionToString collection =
+    case collection of
+        Boring ->
+            "boring"
+
+        Exciting ->
+            "exciting"
+
+
+collectionFileName : Collection -> String
+collectionFileName collection =
+    collectionToString collection ++ ".sgf"
+
+
+collectionUrl : Collection -> String
+collectionUrl collection =
+    "public/" ++ collectionFileName collection
 
 
 themeFromString : String -> Theme
@@ -744,13 +840,13 @@ httpErrorToString error =
             "Bad URL: " ++ url
 
         Http.Timeout ->
-            "Timed out loading boring.sgf"
+            "Timed out loading SGF"
 
         Http.NetworkError ->
-            "Network error loading boring.sgf"
+            "Network error loading SGF"
 
         Http.BadStatus status ->
-            "Could not load boring.sgf: HTTP " ++ String.fromInt status
+            "Could not load SGF: HTTP " ++ String.fromInt status
 
         Http.BadBody message ->
             message

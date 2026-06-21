@@ -26,9 +26,14 @@
     <script>
         var app = Elm.Main.init({
             flags: {
+                collection: localStorage.getItem("collection") || "boring",
                 replaySeconds: parseInt(localStorage.getItem("replaySeconds"), 10) || 5,
                 theme: localStorage.getItem("theme") || "night",
             }
+        });
+
+        app.ports.saveCollection.subscribe(function(collection) {
+            localStorage.setItem("collection", collection);
         });
 
         app.ports.saveReplaySeconds.subscribe(function(seconds) {

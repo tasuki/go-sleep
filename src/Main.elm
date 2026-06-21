@@ -1,12 +1,14 @@
 port module Main exposing (main)
 
 import Browser
+import Browser.Events
 import Browser.Navigation as Nav
 import Dict
-import Html exposing (Html, div, input, label, span, text)
-import Html.Attributes as HtmlAttr exposing (checked, class, hidden, id, name, type_, value)
+import Html exposing (Html, div, p, input, li, span, strong, text, ul)
+import Html.Attributes as HtmlAttr exposing (class, hidden, id, type_, value)
 import Html.Events exposing (onClick, onInput)
 import Http
+import Json.Decode as Decode
 import Random
 import Set exposing (Set)
 import Sgf exposing (Color(..), Game, Move)
@@ -15,10 +17,6 @@ import Svg.Attributes as SvgAttr
 import Time
 import Url exposing (Url)
 
-
-defaultReplaySeconds : Int
-defaultReplaySeconds =
-    5
 
 
 resultSeconds : Int
@@ -86,6 +84,7 @@ type alias Playback =
     , lastMove : Maybe Move
     , settings : Settings
     , settingsOpen : Bool
+    , helpOpen : Bool
     , showingResult : Bool
     }
 
@@ -95,6 +94,8 @@ type Msg
     | PickedRecord String
     | ToggleSettings
     | CloseSettings
+    | ToggleHelp
+    | CloseHelp
     | SetCollection String
     | SetReplaySeconds String
     | SetTheme String
@@ -184,7 +185,7 @@ update msg model =
         ToggleSettings ->
             case model of
                 Playing playback ->
-                    ( Playing { playback | settingsOpen = not playback.settingsOpen }, Cmd.none )
+                    ( Playing { playback | settingsOpen = not playback.settingsOpen, helpOpen = False }, Cmd.none )
 
                 _ ->
                     ( model, Cmd.none )
@@ -193,6 +194,22 @@ update msg model =
             case model of
                 Playing playback ->
                     ( Playing { playback | settingsOpen = False }, Cmd.none )
+
+                _ ->
+                    ( model, Cmd.none )
+
+        ToggleHelp ->
+            case model of
+                Playing playback ->
+                    ( Playing { playback | helpOpen = not playback.helpOpen, settingsOpen = False }, Cmd.none )
+
+                _ ->
+                    ( model, Cmd.none )
+
+        CloseHelp ->
+            case model of
+                Playing playback ->
+                    ( Playing { playback | helpOpen = False }, Cmd.none )
 
                 _ ->
                     ( model, Cmd.none )
@@ -322,6 +339,7 @@ initialPlayback settings game =
     , lastMove = lastMove
     , settings = settings
     , settingsOpen = False
+    , helpOpen = False
     , showingResult = False
     }
 
@@ -361,9 +379,30 @@ rememberLastMove move previous =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
+    Sub.batch
+        [ Browser.Events.onKeyDown keyDecoder
+        , playbackSubscription model
+        ]
+
+
+keyDecoder : Decode.Decoder Msg
+keyDecoder =
+    Decode.field "key" Decode.string
+        |> Decode.andThen
+            (\key ->
+                if key == "?" then
+                    Decode.succeed ToggleHelp
+
+                else
+                    Decode.fail "ignored key"
+            )
+
+
+playbackSubscription : Model -> Sub Msg
+playbackSubscription model =
     case model of
         Playing playback ->
-            if playback.settingsOpen then
+            if playback.settingsOpen || playback.helpOpen then
                 Sub.none
 
             else if playback.showingResult then
@@ -385,6 +424,7 @@ view model =
             , div [ id "board-container" ]
                 [ boardView (visibleBoard model) (visibleLastMove model)
                 , settingsView model
+                , helpView model
                 , resultView model
                 ]
             ]
@@ -399,6 +439,12 @@ menu =
             [ div [ class "icon", onClick ToggleSettings ]
                 [ text "o"
                 , span [ class "tooltip" ] [ text " settings" ]
+                ]
+            ]
+        , div [ class "item" ]
+            [ div [ class "icon", onClick ToggleHelp ]
+                [ text "?"
+                , span [ class "tooltip" ] [ text " help" ]
                 ]
             ]
         , div [ class "item" ]
@@ -429,18 +475,20 @@ settingsView model =
                     , div [ class "settings-board" ]
                         [ div [ class "setting" ]
                             [ div [ class "game-name" ] [ text (gameName playback.game) ]
-                            , div [] [ text "Collection" ]
-                            , div [ class "collections" ]
-                                [ span
-                                    [ class (optionClass (playback.settings.collection == Boring))
-                                    , onClick (SetCollection "boring")
+                            , div [ class "setting-row" ]
+                                [ span [ class "setting-label" ] [ text "Collection" ]
+                                , div [ class "collections" ]
+                                    [ span
+                                        [ class (optionClass (playback.settings.collection == Boring))
+                                        , onClick (SetCollection "boring")
+                                        ]
+                                        [ text "boring" ]
+                                    , span
+                                        [ class (optionClass (playback.settings.collection == Exciting))
+                                        , onClick (SetCollection "exciting")
+                                        ]
+                                        [ text "exciting" ]
                                     ]
-                                    [ text "boring" ]
-                                , span
-                                    [ class (optionClass (playback.settings.collection == Exciting))
-                                    , onClick (SetCollection "exciting")
-                                    ]
-                                    [ text "exciting" ]
                                 ]
                             , div [] [ text ("Replay speed: " ++ String.fromInt playback.settings.replaySeconds ++ " seconds per move") ]
                             , input
@@ -452,22 +500,63 @@ settingsView model =
                                 , onInput SetReplaySeconds
                                 ]
                                 []
-                            , div [] [ text "Theme" ]
-                            , div [ class "themes" ]
-                                [ span
-                                    [ class (optionClass (playback.settings.theme == Night))
-                                    , onClick (SetTheme "night")
+                            , div [ class "setting-row" ]
+                                [ span [ class "setting-label" ] [ text "Theme" ]
+                                , div [ class "themes" ]
+                                    [ span
+                                        [ class (optionClass (playback.settings.theme == Night))
+                                        , onClick (SetTheme "night")
+                                        ]
+                                        [ text "night" ]
+                                    , span
+                                        [ class (optionClass (playback.settings.theme == Day))
+                                        , onClick (SetTheme "day")
+                                        ]
+                                        [ text "day" ]
                                     ]
-                                    [ text "night" ]
-                                , span
-                                    [ class (optionClass (playback.settings.theme == Day))
-                                    , onClick (SetTheme "day")
-                                    ]
-                                    [ text "day" ]
                                 ]
                             ]
                         ]
                     , div [ class "outside-board", onClick CloseSettings ] []
+                    ]
+                ]
+
+        _ ->
+            div [] []
+
+
+helpView : Model -> Html Msg
+helpView model =
+    case model of
+        Playing playback ->
+            div []
+                [ div
+                    [ id "close-help-area"
+                    , hidden (not playback.helpOpen)
+                    , onClick CloseHelp
+                    ]
+                    []
+                , div
+                    [ id "help-overlay"
+                    , hidden (not playback.helpOpen)
+                    ]
+                    [ div [ class "outside-board", onClick CloseHelp ] []
+                    , div [ class "help-board" ]
+                        [ div [ class "help" ]
+                            [ p [] [ text "Collections of kata1-b28c512nbt games from 2025:" ]
+                            , ul []
+                                [ li []
+                                    [ strong [] [ text "boring" ]
+                                    , text ": Games with at least 150 moves where both players' win percentages stay between 40% and 60% through move 150. Records are cut to the first 150 moves."
+                                    ]
+                                , li []
+                                    [ strong [] [ text "exciting" ]
+                                    , text ": Games ending in fewer than 100 moves."
+                                    ]
+                                ]
+                            ]
+                        ]
+                    , div [ class "outside-board", onClick CloseHelp ] []
                     ]
                 ]
 

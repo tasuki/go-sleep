@@ -21,6 +21,11 @@ defaultReplaySeconds =
     5
 
 
+resultSeconds : Int
+resultSeconds =
+    10
+
+
 boardSize : Int
 boardSize =
     19
@@ -360,6 +365,9 @@ subscriptions model =
         Playing playback ->
             if playback.settingsOpen then
                 Sub.none
+
+            else if playback.showingResult then
+                Time.every (toFloat resultSeconds * 1000) (\_ -> Step)
 
             else
                 Time.every (toFloat playback.settings.replaySeconds * 1000) (\_ -> Step)

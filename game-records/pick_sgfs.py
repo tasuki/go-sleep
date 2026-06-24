@@ -22,6 +22,7 @@ Example:
 from __future__ import annotations
 
 import argparse
+import math
 import re
 import sys
 import time
@@ -49,6 +50,16 @@ RULESET_RE = re.compile(r"RU\[(?:\\.|[^\\\]])*\]")
 GN_RE = re.compile(r"GN\[(?:\\.|[^\\\]])*\]")
 ROOT_PROP_RE = re.compile(r"([A-Za-z]+)(?:\[(?:\\.|[^\\\]])*\])+")
 WINRATE_RE = re.compile(r"^\s*([0-9]*\.?[0-9]+)\s+([0-9]*\.?[0-9]+)")
+ANALYSIS_COMMENT_RE = re.compile(
+    r"^\s*"
+    r"([0-9]*\.?[0-9]+)\s+"  # black win probability
+    r"([0-9]*\.?[0-9]+)\s+"  # white win probability
+    r"[0-9]*\.?[0-9]+\s+"  # jigo/no-result probability
+    r"([-+]?[0-9]*\.?[0-9]+)"  # point estimate
+    r"(?:\s+v=\d+)?"  # visits
+    r"(.*?)"
+    r"\s*$"
+)
 
 
 def unescape_sgf_value(value: str) -> str:
@@ -119,6 +130,36 @@ def strip_comments(sgf_text: str) -> str:
     return PLAYER_RE.sub("", sgf_text)
 
 
+def rounded_int(value: float) -> int:
+    if value >= 0:
+        return math.floor(value + 0.5)
+    return math.ceil(value - 0.5)
+
+
+def compact_win_probability(value: str) -> int:
+    # Keep win probabilities to two digits; 1.00 would otherwise become 100.
+    return max(0, min(99, rounded_int(float(value) * 100)))
+
+
+def compact_analysis_comments(sgf_text: str) -> str:
+    def replace_comment(match: re.Match[str]) -> str:
+        comment = unescape_sgf_value(match.group(1))
+        analysis = ANALYSIS_COMMENT_RE.match(comment)
+        if not analysis:
+            return match.group(0)
+
+        black = compact_win_probability(analysis.group(1))
+        white = compact_win_probability(analysis.group(2))
+        score = rounded_int(float(analysis.group(3)))
+        rest = analysis.group(4).strip()
+        compact = f"{black} {white} {score}"
+        if rest:
+            compact += f" {rest}"
+        return f"C[{escape_sgf_value(compact)}]"
+
+    return COMMENT_RE.sub(replace_comment, sgf_text)
+
+
 def cut_to_first_moves(sgf_text: str, starts: list[int], move_count: int) -> str:
     if len(starts) <= move_count:
         return sgf_text
@@ -162,7 +203,9 @@ def set_game_name(sgf_text: str, game_name: str) -> str:
 
 
 def output_line(src: Path, content: str, *, keep_comments: bool) -> str:
-    if not keep_comments:
+    if keep_comments:
+        content = compact_analysis_comments(content)
+    else:
         content = strip_comments(content)
     content = set_game_name(content, src.stem)
     return content.replace("\r", " ").replace("\n", " ").strip() + "\n"

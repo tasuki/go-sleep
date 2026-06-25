@@ -22,13 +22,18 @@ html, body { font-family: "Recursive Sans"; margin: 0; height: 100%; color-schem
     --lines: #0009;
     --black-stone: #222;
     --white-stone: #666;
+    --middle-probability: #444;
     --stone-stroke: #222;
     --overlay: #000A;
     --control-background: #111;
+    --win-probability-bar-height: 5px;
+    --board-size: 100vmin;
 
     color-scheme: dark;
     position: fixed; inset: 0; background: var(--background); color: var(--text);
 }
+
+#app.bar-visible { --board-size: calc(100vmin - var(--win-probability-bar-height)); }
 
 #app.theme-day {
     color-scheme: light;
@@ -40,6 +45,7 @@ html, body { font-family: "Recursive Sans"; margin: 0; height: 100%; color-schem
     --lines: #0009;
     --black-stone: #222;
     --white-stone: #FFF;
+    --middle-probability: #BBB;
     --stone-stroke: #222;
     --overlay: #FFFC;
     --control-background: #FFF;
@@ -57,7 +63,12 @@ html, body { font-family: "Recursive Sans"; margin: 0; height: 100%; color-schem
 @media screen and (max-aspect-ratio: 1/1) { #menu .icon:hover .tooltip { display: block; position: absolute; top: 25px; color: var(--text); } }
 
 #board-container { display: flex; align-items: center; justify-content: center; height: 100%; overflow: hidden; position: relative; }
-#board { width: 100vmin; height: 100vmin; background-color: var(--board); position: relative; }
+#board-stack { width: var(--board-size); }
+#board { display: block; width: var(--board-size); height: var(--board-size); background-color: var(--board); position: relative; }
+#win-probability-bar { display: flex; width: 100%; height: var(--win-probability-bar-height); }
+#win-probability-bar .white-win-probability { background: var(--white-stone); }
+#win-probability-bar .middle-probability { background: var(--middle-probability); }
+#win-probability-bar .black-win-probability { background: var(--black-stone); }
 #lines { stroke: var(--lines); stroke-width: 1.5px; }
 #stars { fill: var(--lines); }
 
@@ -80,17 +91,18 @@ html, body { font-family: "Recursive Sans"; margin: 0; height: 100%; color-schem
 #help-overlay .help-board { width: 100%; height: 100vmin; display: flex; align-items: flex-start; justify-content: flex-start; box-sizing: border-box; padding: 10vmin; }
 #settings-overlay .setting,
 #help-overlay .help { width: 100%; text-align: left; font-size: 24px; }
-#settings-overlay .game-name,
+#settings-overlay .game-name { font-weight: bold; }
 #help-overlay ul { text-align: left; }
 #help-overlay li { margin: 12px 0; }
 #settings-overlay .setting-row { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 30px; margin: 8px 0 20px; }
 #settings-overlay .setting-label { font-weight: 700; }
-#settings-overlay input { width: 100%; margin: 8px 0 20px; background: var(--control-background); color: var(--text); }
+#settings-overlay input { width: 100%; margin-top: 8px; background: var(--control-background); color: var(--text); }
 #settings-overlay .themes,
-#settings-overlay .collections { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 30px; margin: 0; }
+#settings-overlay .collections,
+#settings-overlay .bar-options { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 30px; margin: 0; }
 #settings-overlay .option { cursor: pointer; }
 #settings-overlay .option.active { font-weight: 700; cursor: default; }
 
-#result { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 100vmin; height: 100vmin;
-    background: var(--overlay); color: var(--text); text-align: center; line-height: 100vmin;
+#result { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: var(--board-size); height: var(--board-size);
+    background: var(--overlay); color: var(--text); text-align: center; line-height: var(--board-size);
     font-size: 80px; }

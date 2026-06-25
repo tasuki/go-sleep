@@ -64,6 +64,7 @@ type alias Settings =
     { collection : Collection
     , replaySeconds : Int
     , theme : Theme
+    , bar : Bar
     }
 
 
@@ -75,6 +76,11 @@ type Collection
 type Theme
     = Night
     | Day
+
+
+type Bar
+    = HideBar
+    | ShowBar
 
 
 type alias Playback =
@@ -99,6 +105,7 @@ type Msg
     | SetCollection String
     | SetReplaySeconds String
     | SetTheme String
+    | SetBar String
     | Step
     | Skip
     | UrlRequested Browser.UrlRequest
@@ -118,10 +125,14 @@ port saveReplaySeconds : Int -> Cmd msg
 port saveTheme : String -> Cmd msg
 
 
+port saveBar : String -> Cmd msg
+
+
 type alias Flags =
     { collection : String
     , replaySeconds : Int
     , theme : String
+    , bar : String
     }
 
 
@@ -266,6 +277,23 @@ update msg model =
                     in
                     ( Playing { playback | settings = { settings | theme = theme } }
                     , saveTheme (themeToString theme)
+                    )
+
+                _ ->
+                    ( model, Cmd.none )
+
+        SetBar rawBar ->
+            case model of
+                Playing playback ->
+                    let
+                        settings =
+                            playback.settings
+
+                        bar =
+                            barFromString rawBar
+                    in
+                    ( Playing { playback | settings = { settings | bar = bar } }
+                    , saveBar (barToString bar)
                     )
 
                 _ ->
@@ -419,10 +447,13 @@ view : Model -> Browser.Document Msg
 view model =
     { title = "Go Sleep"
     , body =
-        [ div [ id "app", class ("theme-" ++ themeToString (settingsOf model).theme) ]
+        [ div [ id "app", class (appClass model) ]
             [ menu
             , div [ id "board-container" ]
-                [ boardView (visibleBoard model) (visibleLastMove model)
+                [ div [ id "board-stack" ]
+                    [ boardView (visibleBoard model) (visibleLastMove model)
+                    , winProbabilityBarView (settingsOf model) (visibleLastMove model)
+                    ]
                 , settingsView model
                 , helpView model
                 , resultView model
@@ -474,7 +505,20 @@ settingsView model =
                     [ div [ class "outside-board", onClick CloseSettings ] []
                     , div [ class "settings-board" ]
                         [ div [ class "setting" ]
-                            [ div [ class "game-name" ] [ text (gameName playback.game) ]
+                            [ div [ class "setting-row game-name" ] [ text (gameName playback.game) ]
+                            , div [ class "setting-row" ]
+                                [ span [ class "setting-label" ] [ text "Replay speed" ]
+                                , span [] [ text (String.fromInt playback.settings.replaySeconds ++ " seconds per move") ]
+                                , input
+                                    [ type_ "range"
+                                    , HtmlAttr.min "1"
+                                    , HtmlAttr.max "10"
+                                    , HtmlAttr.step "1"
+                                    , value (String.fromInt playback.settings.replaySeconds)
+                                    , onInput SetReplaySeconds
+                                    ]
+                                    []
+                                ]
                             , div [ class "setting-row" ]
                                 [ span [ class "setting-label" ] [ text "Collection" ]
                                 , div [ class "collections" ]
@@ -490,16 +534,6 @@ settingsView model =
                                         [ text "exciting" ]
                                     ]
                                 ]
-                            , div [] [ text ("Replay speed: " ++ String.fromInt playback.settings.replaySeconds ++ " seconds per move") ]
-                            , input
-                                [ type_ "range"
-                                , HtmlAttr.min "1"
-                                , HtmlAttr.max "10"
-                                , HtmlAttr.step "1"
-                                , value (String.fromInt playback.settings.replaySeconds)
-                                , onInput SetReplaySeconds
-                                ]
-                                []
                             , div [ class "setting-row" ]
                                 [ span [ class "setting-label" ] [ text "Theme" ]
                                 , div [ class "themes" ]
@@ -513,6 +547,21 @@ settingsView model =
                                         , onClick (SetTheme "day")
                                         ]
                                         [ text "day" ]
+                                    ]
+                                ]
+                            , div [ class "setting-row" ]
+                                [ span [ class "setting-label" ] [ text "Win bar" ]
+                                , div [ class "bar-options" ]
+                                    [ span
+                                        [ class (optionClass (playback.settings.bar == HideBar))
+                                        , onClick (SetBar "hide")
+                                        ]
+                                        [ text "hide" ]
+                                    , span
+                                        [ class (optionClass (playback.settings.bar == ShowBar))
+                                        , onClick (SetBar "show")
+                                        ]
+                                        [ text "show" ]
                                     ]
                                 ]
                             ]
@@ -742,6 +791,114 @@ lastMoveMarker lastMove =
             []
 
 
+type alias Analysis =
+    { blackWin : Float
+    , whiteWin : Float
+    , score : Int
+    }
+
+
+winProbabilityBarView : Settings -> Maybe Move -> Html Msg
+winProbabilityBarView settings maybeMove =
+    case visibleAnalysis settings maybeMove of
+        Just analysis ->
+            let
+                white =
+                    clamp 0 100 analysis.whiteWin
+
+                black =
+                    clamp 0 100 analysis.blackWin
+
+                middle =
+                    clamp 0 100 (100 - white - black)
+            in
+            div [ id "win-probability-bar" ]
+                [ div
+                    [ class "white-win-probability"
+                    , HtmlAttr.style "width" (percent white)
+                    ]
+                    []
+                , div
+                    [ class "middle-probability"
+                    , HtmlAttr.style "width" (percent middle)
+                    ]
+                    []
+                , div
+                    [ class "black-win-probability"
+                    , HtmlAttr.style "width" (percent black)
+                    ]
+                    []
+                ]
+
+        Nothing ->
+            text ""
+
+
+visibleAnalysis : Settings -> Maybe Move -> Maybe Analysis
+visibleAnalysis settings maybeMove =
+    if settings.bar == ShowBar then
+        maybeMove |> Maybe.andThen .comment |> Maybe.andThen analysisFromComment
+
+    else
+        Nothing
+
+
+appClass : Model -> String
+appClass model =
+    let
+        settings =
+            settingsOf model
+
+        barClass =
+            case model of
+                Playing playback ->
+                    if visibleAnalysis settings playback.lastMove /= Nothing then
+                        " bar-visible"
+
+                    else
+                        ""
+
+                _ ->
+                    ""
+    in
+    "theme-" ++ themeToString settings.theme ++ barClass
+
+
+analysisFromComment : String -> Maybe Analysis
+analysisFromComment comment =
+    case String.words comment of
+        whiteRaw :: blackRaw :: scoreRaw :: _ ->
+            Maybe.map3 analysisFromCompactNumbers
+                (String.toFloat whiteRaw)
+                (String.toFloat blackRaw)
+                (String.toFloat scoreRaw)
+
+        _ ->
+            Nothing
+
+
+analysisFromCompactNumbers : Float -> Float -> Float -> Analysis
+analysisFromCompactNumbers white black score =
+    { whiteWin = white
+    , blackWin = black
+    , score = roundedInt score
+    }
+
+
+roundedInt : Float -> Int
+roundedInt value =
+    if value >= 0 then
+        floor (value + 0.5)
+
+    else
+        ceiling (value - 0.5)
+
+
+percent : Float -> String
+percent value =
+    String.fromFloat value ++ "%"
+
+
 resultView : Model -> Html Msg
 resultView model =
     case model of
@@ -797,6 +954,7 @@ settingsFromFlags flags =
     { collection = collectionFromString flags.collection
     , replaySeconds = validReplaySeconds flags.replaySeconds
     , theme = themeFromString flags.theme
+    , bar = barFromString flags.bar
     }
 
 
@@ -853,6 +1011,26 @@ themeToString theme =
 
         Day ->
             "day"
+
+
+barFromString : String -> Bar
+barFromString rawBar =
+    case rawBar of
+        "show" ->
+            ShowBar
+
+        _ ->
+            HideBar
+
+
+barToString : Bar -> String
+barToString bar =
+    case bar of
+        HideBar ->
+            "hide"
+
+        ShowBar ->
+            "show"
 
 
 gameName : Game -> String

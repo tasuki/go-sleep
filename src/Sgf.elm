@@ -33,6 +33,7 @@ type alias Move =
     { color : Color
     , point : Maybe Point
     , raw : String
+    , comment : Maybe String
     }
 
 
@@ -238,20 +239,41 @@ rootProperties nodes =
 
 movesFromNodes : List Node -> List Move
 movesFromNodes nodes =
-    List.concatMap (List.filterMap moveFromProperty) nodes
+    List.filterMap moveFromNode nodes
 
 
-moveFromProperty : Property -> Maybe Move
-moveFromProperty property =
+moveFromNode : Node -> Maybe Move
+moveFromNode node =
+    let
+        comment =
+            propertyValues "C" node
+                |> Maybe.andThen List.head
+    in
+    node
+        |> List.filterMap moveProperty
+        |> List.head
+        |> Maybe.map (\move -> { move | comment = comment })
+
+
+moveProperty : Property -> Maybe Move
+moveProperty property =
     case ( property.identifier, property.values ) of
         ( "B", raw :: _ ) ->
-            Just { color = Black, point = pointFromString raw, raw = raw }
+            Just { color = Black, point = pointFromString raw, raw = raw, comment = Nothing }
 
         ( "W", raw :: _ ) ->
-            Just { color = White, point = pointFromString raw, raw = raw }
+            Just { color = White, point = pointFromString raw, raw = raw, comment = Nothing }
 
         _ ->
             Nothing
+
+
+propertyValues : String -> Node -> Maybe (List String)
+propertyValues identifier node =
+    node
+        |> List.filter (\property -> property.identifier == identifier)
+        |> List.head
+        |> Maybe.map .values
 
 
 pointFromString : String -> Maybe Point

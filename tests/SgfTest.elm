@@ -32,9 +32,9 @@ suite =
                 expectFirstSampleGame <|
                     \game ->
                         Expect.equal
-                            [ { color = Black, point = Just { x = 3, y = 3 }, raw = "dd" }
-                            , { color = White, point = Just { x = 3, y = 15 }, raw = "dp" }
-                            , { color = Black, point = Just { x = 15, y = 15 }, raw = "pp" }
+                            [ { color = Black, point = Just { x = 3, y = 3 }, raw = "dd", comment = Nothing }
+                            , { color = White, point = Just { x = 3, y = 15 }, raw = "dp", comment = Nothing }
+                            , { color = Black, point = Just { x = 15, y = 15 }, raw = "pp", comment = Nothing }
                             ]
                             (List.take 3 game.moves)
         , test "unescapes property values" <|
@@ -42,7 +42,7 @@ suite =
                 expectSingleGame "(;C[hello\\] there\\\\ friend];B[])" <|
                     Expect.all
                         [ \game -> Expect.equal (Just [ "hello] there\\ friend" ]) (Dict.get "C" game.properties)
-                        , \game -> Expect.equal [ { color = Black, point = Nothing, raw = "" } ] game.moves
+                        , \game -> Expect.equal [ { color = Black, point = Nothing, raw = "", comment = Nothing } ] game.moves
                         ]
         ]
 

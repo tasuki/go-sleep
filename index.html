@@ -29,6 +29,7 @@
                 collection: localStorage.getItem("collection") || "boring",
                 replaySeconds: parseInt(localStorage.getItem("replaySeconds"), 10) || 5,
                 theme: localStorage.getItem("theme") || "night",
+                bar: localStorage.getItem("bar") || "hide",
             }
         });
 
@@ -42,6 +43,10 @@
 
         app.ports.saveTheme.subscribe(function(theme) {
             localStorage.setItem("theme", theme);
+        });
+
+        app.ports.saveBar.subscribe(function(bar) {
+            localStorage.setItem("bar", bar);
         });
     </script>
 </body>

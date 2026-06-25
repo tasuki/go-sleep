@@ -8,14 +8,14 @@
 
     <link rel="stylesheet" href="public/style.css" />
     <link rel="icon" href="public/favicon.svg">
-	<!--
     <link rel="manifest" href="manifest.json">
     <script>
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('service-worker.js');
+        window.addEventListener('load', function() {
+            navigator.serviceWorker.register('service-worker.js');
+        });
     }
     </script>
-	-->
     <script src="go-sleep.js"></script>
 </head>
 <body>

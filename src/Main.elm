@@ -505,9 +505,12 @@ settingsView model =
                     [ div [ class "outside-board", onClick CloseSettings ] []
                     , div [ class "settings-board" ]
                         [ div [ class "setting" ]
-                            [ div [ class "setting-row game-name" ] [ text (gameName playback.game) ]
+                            [ div [ class "setting-row" ]
+                                [ span [ class "setting-label" ] [ text "Game" ]
+                                , span [] [ text (gameName playback.game) ]
+                                ]
                             , div [ class "setting-row" ]
-                                [ span [ class "setting-label" ] [ text "Replay speed" ]
+                                [ span [ class "setting-label" ] [ text "Speed" ]
                                 , span [] [ text (String.fromInt playback.settings.replaySeconds ++ " seconds per move") ]
                                 , input
                                     [ type_ "range"

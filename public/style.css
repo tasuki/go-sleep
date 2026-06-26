@@ -91,11 +91,10 @@ html, body { font-family: "Recursive Sans"; margin: 0; height: 100%; color-schem
 #help-overlay .help-board { width: 100%; height: 100vmin; display: flex; align-items: flex-start; justify-content: flex-start; box-sizing: border-box; padding: 10vmin; }
 #settings-overlay .setting,
 #help-overlay .help { width: 100%; text-align: left; font-size: 24px; }
-#settings-overlay .game-name { font-weight: bold; }
 #help-overlay ul { text-align: left; }
 #help-overlay li { margin: 12px 0; }
 #settings-overlay .setting-row { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 30px; margin: 8px 0 20px; }
-#settings-overlay .setting-label { font-weight: 700; }
+#settings-overlay .setting-label { font-style: italic; }
 #settings-overlay input { width: 100%; margin-top: 8px; background: var(--control-background); color: var(--text); }
 #settings-overlay .themes,
 #settings-overlay .collections,

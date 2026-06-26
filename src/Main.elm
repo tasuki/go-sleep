@@ -417,11 +417,18 @@ keyDecoder =
     Decode.field "key" Decode.string
         |> Decode.andThen
             (\key ->
-                if key == "?" then
-                    Decode.succeed ToggleHelp
+                case key of
+                    "o" ->
+                        Decode.succeed ToggleSettings
 
-                else
-                    Decode.fail "ignored key"
+                    "?" ->
+                        Decode.succeed ToggleHelp
+
+                    "x" ->
+                        Decode.succeed Skip
+
+                    _ ->
+                        Decode.fail "ignored key"
             )
 
 

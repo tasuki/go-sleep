@@ -4,7 +4,7 @@ import Browser
 import Browser.Events
 import Browser.Navigation as Nav
 import Dict
-import Html exposing (Html, div, p, input, li, span, strong, text, ul)
+import Html exposing (Html, div, input, li, p, span, strong, text, ul)
 import Html.Attributes as HtmlAttr exposing (class, hidden, id, type_, value)
 import Html.Events exposing (onClick, onInput)
 import Http
@@ -16,7 +16,6 @@ import Svg exposing (Svg, circle, g, line, svg)
 import Svg.Attributes as SvgAttr
 import Time
 import Url exposing (Url)
-
 
 
 resultSeconds : Int
@@ -448,7 +447,7 @@ view model =
     { title = "Go Sleep"
     , body =
         [ div [ id "app", class (appClass model) ]
-            [ menu
+            [ menu model
             , div [ id "board-container" ]
                 [ div [ id "board-stack" ]
                     [ boardView (visibleBoard model) (visibleLastMove model)
@@ -463,28 +462,58 @@ view model =
     }
 
 
-menu : Html Msg
-menu =
+menu : Model -> Html Msg
+menu model =
     div [ id "menu" ]
-        [ div [ class "item" ]
+        ([ div [ class "item" ]
             [ div [ class "icon", onClick ToggleSettings ]
                 [ text "o"
                 , span [ class "tooltip" ] [ text " settings" ]
                 ]
             ]
-        , div [ class "item" ]
+         , div [ class "item" ]
             [ div [ class "icon", onClick ToggleHelp ]
                 [ text "?"
                 , span [ class "tooltip" ] [ text " help" ]
                 ]
             ]
-        , div [ class "item" ]
+         , div [ class "item" ]
             [ div [ class "icon", onClick Skip ]
                 [ text "x"
                 , span [ class "tooltip" ] [ text " skip" ]
                 ]
             ]
-        ]
+         ]
+            ++ pointLeadMenuItems model
+        )
+
+
+pointLeadMenuItems : Model -> List (Html Msg)
+pointLeadMenuItems model =
+    case model of
+        Playing playback ->
+            case visibleAnalysis playback.settings playback.lastMove of
+                Just analysis ->
+                    [ div [ class "item" ]
+                        [ div [ class ("lead-circle " ++ leadCircleClass analysis.score) ]
+                            [ text (String.fromInt (abs analysis.score)) ]
+                        ]
+                    ]
+
+                Nothing ->
+                    []
+
+        _ ->
+            []
+
+
+leadCircleClass : Int -> String
+leadCircleClass score =
+    if score >= 0 then
+        "white-lead"
+
+    else
+        "black-lead"
 
 
 settingsView : Model -> Html Msg

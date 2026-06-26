@@ -56,6 +56,9 @@ html, body { font-family: "Recursive Sans"; margin: 0; height: 100%; color-schem
 @media screen and (min-aspect-ratio: 1/1) { #menu .item { float: none; } }
 #menu .icon { display: block; cursor: pointer; background-color: var(--menu-background); color: var(--menu-text);
     border-radius: 30px; line-height: 30px; width: 30px; height: 30px; text-align: center; }
+#menu .lead-circle { display: block; border-radius: 30px; line-height: 30px; width: 30px; height: 30px; text-align: center; }
+#menu .lead-circle.white-lead { background-color: var(--white-stone); color: var(--black-stone); }
+#menu .lead-circle.black-lead { background-color: var(--black-stone); color: var(--white-stone); }
 
 #menu .icon .tooltip { display: none; }
 #menu .icon:hover .tooltip { display: inline; }

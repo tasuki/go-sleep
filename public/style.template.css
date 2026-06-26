@@ -1,14 +1,14 @@
 @font-face {
     font-family: "Recursive Sans"; font-style: normal; font-weight: 400; font-display: swap;
-    src: url('recursive-sans-csl-400.woff2') format('woff2');
+    src: url('__FONT_400_URL__') format('woff2');
 }
 @font-face {
     font-family: "Recursive Sans"; font-style: italic; font-weight: 400; font-display: swap;
-    src: url('recursive-sans-csl-400i.woff2') format('woff2');
+    src: url('__FONT_400I_URL__') format('woff2');
 }
 @font-face {
     font-family: "Recursive Sans"; font-style: normal; font-weight: 700; font-display: swap;
-    src: url('recursive-sans-csl-700.woff2') format('woff2');
+    src: url('__FONT_700_URL__') format('woff2');
 }
 
 html, body { font-family: "Recursive Sans"; margin: 0; height: 100%; color-scheme: dark; }

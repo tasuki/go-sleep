@@ -2,6 +2,7 @@ port module Main exposing (main)
 
 import Browser
 import Browser.Events
+import AssetPaths
 import Browser.Navigation as Nav
 import Dict
 import Html exposing (Html, div, input, li, p, span, strong, text, ul)
@@ -1180,7 +1181,12 @@ collectionFileName collection =
 
 collectionUrl : Collection -> String
 collectionUrl collection =
-    "public/" ++ collectionFileName collection
+    case collection of
+        Boring ->
+            AssetPaths.boringSgf
+
+        Exciting ->
+            AssetPaths.excitingSgf
 
 
 themeFromString : String -> Theme

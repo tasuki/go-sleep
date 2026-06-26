@@ -8,14 +8,14 @@ run = 'serve -p 5733 --single'
 run = """
 watchexec --restart --verbose \
   --wrap-process=session --exts=elm --debounce=100ms \
-  -- elm make src/Main.elm --debug --output=go-sleep.js
+  -- ./scripts/build.sh --debug
 """
 
 [tasks.dev]
 depends = ["dev:build", "dev:serve"]
 
 [tasks.build]
-run = 'elm make src/Main.elm --output=go-sleep.js'
+run = './scripts/build.sh'
 
 [tasks.test]
 run = 'elm-test'

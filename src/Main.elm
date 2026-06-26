@@ -567,21 +567,6 @@ settingsView model =
                                     ]
                                 ]
                             , div [ class "setting-row" ]
-                                [ span [ class "setting-label" ] [ text "Theme" ]
-                                , div [ class "themes" ]
-                                    [ span
-                                        [ class (optionClass (playback.settings.theme == Night))
-                                        , onClick (SetTheme "night")
-                                        ]
-                                        [ text "night" ]
-                                    , span
-                                        [ class (optionClass (playback.settings.theme == Day))
-                                        , onClick (SetTheme "day")
-                                        ]
-                                        [ text "day" ]
-                                    ]
-                                ]
-                            , div [ class "setting-row" ]
                                 [ span [ class "setting-label" ] [ text "Win bar" ]
                                 , div [ class "bar-options" ]
                                     [ span
@@ -594,6 +579,21 @@ settingsView model =
                                         , onClick (SetBar "show")
                                         ]
                                         [ text "show" ]
+                                    ]
+                                ]
+                            , div [ class "setting-row" ]
+                                [ span [ class "setting-label" ] [ text "Theme" ]
+                                , div [ class "themes" ]
+                                    [ span
+                                        [ class (optionClass (playback.settings.theme == Night))
+                                        , onClick (SetTheme "night")
+                                        ]
+                                        [ text "night" ]
+                                    , span
+                                        [ class (optionClass (playback.settings.theme == Day))
+                                        , onClick (SetTheme "day")
+                                        ]
+                                        [ text "day" ]
                                     ]
                                 ]
                             ]

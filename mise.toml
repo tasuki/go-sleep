@@ -2,7 +2,7 @@
 run = 'podman build -t docker.io/tasuki/pi-go-sleep:latest -f Containerfile.dev .'
 
 [tasks."dev:serve"]
-run = 'serve -p 5733 --single'
+run = 'mkdir -p dist && serve dist -p 5733 --single'
 
 [tasks."dev:build"]
 run = """

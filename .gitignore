@@ -3,8 +3,5 @@ game-records/sgfs/
 elm-stuff/
 
 # Generated build outputs
-go-sleep.js
-index.html
-service-worker.js
-public/style.css
+dist/
 src/AssetPaths.elm

@@ -28,12 +28,6 @@ jobs:
       - name: Build
         run: mise run build
 
-      - name: Prepare site
-        run: |
-          mkdir dist
-          cp index.html go-sleep.js manifest.json service-worker.js dist/
-          cp -R public dist/public
-
       - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3

@@ -668,7 +668,7 @@ settingsView model =
                         [ div [ class "setting" ]
                             [ div [ class "setting-row" ]
                                 [ span [ class "setting-label" ] [ text "Game" ]
-                                , span [] [ text (gameName playback.game) ]
+                                , span [] [ text (settingsGameName playback.game) ]
                                 ]
                             , div [ class "setting-row" ]
                                 [ span [ class "setting-label" ] [ text "Speed" ]
@@ -1255,6 +1255,19 @@ gameName game =
         |> Dict.get "GN"
         |> Maybe.andThen List.head
         |> Maybe.withDefault "Untitled game"
+
+
+settingsGameName : Game -> String
+settingsGameName game =
+    let
+        name =
+            gameName game
+    in
+    if String.length name > 16 && not (String.contains " " name) then
+        String.left 16 name
+
+    else
+        name
 
 
 formatResult : Game -> String

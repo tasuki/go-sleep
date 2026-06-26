@@ -30,6 +30,7 @@
                 replaySeconds: parseInt(localStorage.getItem("replaySeconds"), 10) || 5,
                 theme: localStorage.getItem("theme") || "night",
                 bar: localStorage.getItem("bar") || "hide",
+                playMode: localStorage.getItem("playMode") || "auto",
             }
         });
 
@@ -47,6 +48,10 @@
 
         app.ports.saveBar.subscribe(function(bar) {
             localStorage.setItem("bar", bar);
+        });
+
+        app.ports.savePlayMode.subscribe(function(playMode) {
+            localStorage.setItem("playMode", playMode);
         });
     </script>
 </body>

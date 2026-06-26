@@ -64,6 +64,7 @@ type alias Settings =
     , replaySeconds : Int
     , theme : Theme
     , bar : Bar
+    , playMode : PlayMode
     }
 
 
@@ -82,9 +83,15 @@ type Bar
     | ShowBar
 
 
+type PlayMode
+    = Auto
+    | Manual
+
+
 type alias Playback =
     { game : Game
     , board : Board
+    , playedMoves : List Move
     , remainingMoves : List Move
     , lastMove : Maybe Move
     , settings : Settings
@@ -105,7 +112,10 @@ type Msg
     | SetReplaySeconds String
     | SetTheme String
     | SetBar String
+    | SetPlayMode String
     | Step
+    | Back
+    | Forward
     | Skip
     | UrlRequested Browser.UrlRequest
     | UrlChanged Url
@@ -127,11 +137,15 @@ port saveTheme : String -> Cmd msg
 port saveBar : String -> Cmd msg
 
 
+port savePlayMode : String -> Cmd msg
+
+
 type alias Flags =
     { collection : String
     , replaySeconds : Int
     , theme : String
     , bar : String
+    , playMode : String
     }
 
 
@@ -298,10 +312,51 @@ update msg model =
                 _ ->
                     ( model, Cmd.none )
 
+        SetPlayMode rawPlayMode ->
+            case model of
+                Playing playback ->
+                    let
+                        settings =
+                            playback.settings
+
+                        playMode =
+                            playModeFromString rawPlayMode
+                    in
+                    ( Playing { playback | settings = { settings | playMode = playMode } }
+                    , savePlayMode (playModeToString playMode)
+                    )
+
+                _ ->
+                    ( model, Cmd.none )
+
         Step ->
             case model of
                 Playing playback ->
                     stepPlayback playback
+
+                _ ->
+                    ( model, Cmd.none )
+
+        Back ->
+            case model of
+                Playing playback ->
+                    if playback.settings.playMode == Manual && not playback.settingsOpen && not playback.helpOpen then
+                        backPlayback playback
+
+                    else
+                        ( model, Cmd.none )
+
+                _ ->
+                    ( model, Cmd.none )
+
+        Forward ->
+            case model of
+                Playing playback ->
+                    if playback.settings.playMode == Manual && not playback.settingsOpen && not playback.helpOpen then
+                        manualForwardPlayback playback
+
+                    else
+                        ( model, Cmd.none )
 
                 _ ->
                     ( model, Cmd.none )
@@ -352,18 +407,27 @@ playGame settings game =
 initialPlayback : Settings -> Game -> Playback
 initialPlayback settings game =
     let
-        ( board, remainingMoves, lastMove ) =
+        initial =
             case game.moves of
                 firstMove :: rest ->
-                    ( applyMove firstMove Dict.empty, rest, rememberLastMove firstMove Nothing )
+                    { board = applyMove firstMove Dict.empty
+                    , playedMoves = [ firstMove ]
+                    , remainingMoves = rest
+                    , lastMove = rememberLastMove firstMove Nothing
+                    }
 
                 [] ->
-                    ( Dict.empty, [], Nothing )
+                    { board = Dict.empty
+                    , playedMoves = []
+                    , remainingMoves = []
+                    , lastMove = Nothing
+                    }
     in
     { game = game
-    , board = board
-    , remainingMoves = remainingMoves
-    , lastMove = lastMove
+    , board = initial.board
+    , playedMoves = initial.playedMoves
+    , remainingMoves = initial.remainingMoves
+    , lastMove = initial.lastMove
     , settings = settings
     , settingsOpen = False
     , helpOpen = False
@@ -373,25 +437,78 @@ initialPlayback settings game =
 
 stepPlayback : Playback -> ( Model, Cmd Msg )
 stepPlayback playback =
+    case advancePlayback playback of
+        Just advancedPlayback ->
+            ( Playing advancedPlayback, Cmd.none )
+
+        Nothing ->
+            ( Loading playback.settings, fetchSgf playback.settings )
+
+
+manualForwardPlayback : Playback -> ( Model, Cmd Msg )
+manualForwardPlayback playback =
+    case advancePlayback playback of
+        Just advancedPlayback ->
+            ( Playing advancedPlayback, Cmd.none )
+
+        Nothing ->
+            ( Playing playback, Cmd.none )
+
+
+advancePlayback : Playback -> Maybe Playback
+advancePlayback playback =
     case playback.remainingMoves of
         move :: rest ->
-            ( Playing
+            Just
                 { playback
                     | board = applyMove move playback.board
+                    , playedMoves = playback.playedMoves ++ [ move ]
                     , remainingMoves = rest
                     , lastMove = rememberLastMove move playback.lastMove
                 }
-            , Cmd.none
-            )
 
         [] ->
             if not playback.showingResult then
-                ( Playing { playback | showingResult = True }
+                Just { playback | showingResult = True }
+
+            else
+                Nothing
+
+
+backPlayback : Playback -> ( Model, Cmd Msg )
+backPlayback playback =
+    if playback.showingResult then
+        ( Playing { playback | showingResult = False }, Cmd.none )
+
+    else
+        case List.reverse playback.playedMoves of
+            lastPlayed :: earlierReversed ->
+                let
+                    earlierMoves =
+                        List.reverse earlierReversed
+                in
+                ( Playing
+                    { playback
+                        | board = boardFromMoves earlierMoves
+                        , playedMoves = earlierMoves
+                        , remainingMoves = lastPlayed :: playback.remainingMoves
+                        , lastMove = lastMoveFromMoves earlierMoves
+                    }
                 , Cmd.none
                 )
 
-            else
-                ( Loading playback.settings, fetchSgf playback.settings )
+            [] ->
+                ( Playing playback, Cmd.none )
+
+
+boardFromMoves : List Move -> Board
+boardFromMoves moves =
+    List.foldl applyMove Dict.empty moves
+
+
+lastMoveFromMoves : List Move -> Maybe Move
+lastMoveFromMoves moves =
+    List.foldl rememberLastMove Nothing moves
 
 
 rememberLastMove : Move -> Maybe Move -> Maybe Move
@@ -427,6 +544,12 @@ keyDecoder =
                     "x" ->
                         Decode.succeed Skip
 
+                    "ArrowLeft" ->
+                        Decode.succeed Back
+
+                    "ArrowRight" ->
+                        Decode.succeed Forward
+
                     _ ->
                         Decode.fail "ignored key"
             )
@@ -436,7 +559,7 @@ playbackSubscription : Model -> Sub Msg
 playbackSubscription model =
     case model of
         Playing playback ->
-            if playback.settingsOpen || playback.helpOpen then
+            if playback.settingsOpen || playback.helpOpen || playback.settings.playMode == Manual then
                 Sub.none
 
             else if playback.showingResult then
@@ -458,6 +581,7 @@ view model =
             , div [ id "board-container" ]
                 [ div [ id "board-stack" ]
                     [ boardView (visibleBoard model) (visibleLastMove model)
+                    , manualBoardControls model
                     , winProbabilityBarView (settingsOf model) (visibleLastMove model)
                     ]
                 , settingsView model
@@ -603,6 +727,21 @@ settingsView model =
                                         [ text "day" ]
                                     ]
                                 ]
+                            , div [ class "setting-row" ]
+                                [ span [ class "setting-label" ] [ text "Play" ]
+                                , div [ class "play-options" ]
+                                    [ span
+                                        [ class (optionClass (playback.settings.playMode == Auto))
+                                        , onClick (SetPlayMode "auto")
+                                        ]
+                                        [ text "auto" ]
+                                    , span
+                                        [ class (optionClass (playback.settings.playMode == Manual))
+                                        , onClick (SetPlayMode "manual")
+                                        ]
+                                        [ text "manual" ]
+                                    ]
+                                ]
                             ]
                         ]
                     , div [ class "outside-board", onClick CloseSettings ] []
@@ -650,6 +789,17 @@ helpView model =
 
         _ ->
             div [] []
+
+
+manualBoardControls : Model -> Html Msg
+manualBoardControls model =
+    div
+        [ id "manual-controls"
+        , hidden (.playMode (settingsOf model) /= Manual)
+        ]
+        [ div [ class "manual-control-half", onClick Back ] []
+        , div [ class "manual-control-half", onClick Forward ] []
+        ]
 
 
 boardView : Board -> Maybe Move -> Html Msg
@@ -994,6 +1144,7 @@ settingsFromFlags flags =
     , replaySeconds = validReplaySeconds flags.replaySeconds
     , theme = themeFromString flags.theme
     , bar = barFromString flags.bar
+    , playMode = playModeFromString flags.playMode
     }
 
 
@@ -1070,6 +1221,26 @@ barToString bar =
 
         ShowBar ->
             "show"
+
+
+playModeFromString : String -> PlayMode
+playModeFromString rawPlayMode =
+    case rawPlayMode of
+        "manual" ->
+            Manual
+
+        _ ->
+            Auto
+
+
+playModeToString : PlayMode -> String
+playModeToString playMode =
+    case playMode of
+        Auto ->
+            "auto"
+
+        Manual ->
+            "manual"
 
 
 gameName : Game -> String

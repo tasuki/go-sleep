@@ -66,8 +66,11 @@ html, body { font-family: "Recursive Sans"; margin: 0; height: 100%; color-schem
 @media screen and (max-aspect-ratio: 1/1) { #menu .icon:hover .tooltip { display: block; position: absolute; top: 25px; color: var(--text); } }
 
 #board-container { display: flex; align-items: center; justify-content: center; height: 100%; overflow: hidden; position: relative; }
-#board-stack { width: var(--board-size); }
+#board-stack { width: var(--board-size); position: relative; }
 #board { display: block; width: var(--board-size); height: var(--board-size); background-color: var(--board); position: relative; }
+#manual-controls { position: absolute; left: 0; top: 0; width: 100%; height: var(--board-size); z-index: 2; display: flex; }
+#manual-controls[hidden] { display: none; }
+#manual-controls .manual-control-half { flex: 1; cursor: pointer; }
 #win-probability-bar { display: flex; width: 100%; height: var(--win-probability-bar-height); }
 #win-probability-bar .white-win-probability { background: var(--white-stone); }
 #win-probability-bar .middle-probability { background: var(--middle-probability); }
@@ -101,7 +104,8 @@ html, body { font-family: "Recursive Sans"; margin: 0; height: 100%; color-schem
 #settings-overlay input { width: 100%; margin-top: 8px; background: var(--control-background); color: var(--text); }
 #settings-overlay .themes,
 #settings-overlay .collections,
-#settings-overlay .bar-options { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 30px; margin: 0; }
+#settings-overlay .bar-options,
+#settings-overlay .play-options { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 30px; margin: 0; }
 #settings-overlay .option { cursor: pointer; }
 #settings-overlay .option.active { font-weight: 700; cursor: default; }
 

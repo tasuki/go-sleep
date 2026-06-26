@@ -598,12 +598,12 @@ helpView model =
                             [ p [] [ text "Collections of kata1-b28c512nbt games from 2025:" ]
                             , ul []
                                 [ li []
-                                    [ strong [] [ text "boring" ]
-                                    , text ": Games with at least 150 moves where both players' win percentages stay between 40% and 60% through move 150. Records are cut to the first 150 moves."
+                                    [ strong [] [ text "boring: " ]
+                                    , text "Games where win percentage stays between 40% and 60% till move 150. Records are cut to the first 150 moves."
                                     ]
                                 , li []
-                                    [ strong [] [ text "exciting" ]
-                                    , text ": Games ending in fewer than 100 moves."
+                                    [ strong [] [ text "exciting: " ]
+                                    , text "Games ending in fewer than 100 moves."
                                     ]
                                 ]
                             ]
